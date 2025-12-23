@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
-import { GameStatus, PlayerStats, Enemy, Bullet, Gem, EnemyType, Particle } from '../types';
-import { COLORS, ENEMY_TYPES, MAP_WIDTH, MAP_HEIGHT, CHARACTERS } from '../constants';
+import { GameStatus, PlayerStats, Enemy, Bullet, Gem, EnemyType, GemType } from '../types';
+import { COLORS, ENEMY_TYPES, MAP_WIDTH, MAP_HEIGHT, PICKUP_CHANCES } from '../constants';
 import { playSound } from '../utils/SoundManager';
 
 interface GameCanvasProps {
@@ -16,7 +16,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const skinImageRef = useRef<HTMLCanvasElement | null>(null);
 
-  // AI Skin Background Removal (Chroma Key Black to Alpha)
   useEffect(() => {
     if (playerStats.customSkinUrl) {
       const img = new Image();
@@ -31,11 +30,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
         const imgData = oCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
         const data = imgData.data;
         for (let i = 0; i < data.length; i += 4) {
-          // AI images often have compression artifacts, so we check a range
-          const r = data[i], g = data[i+1], b = data[i+2];
-          if (r < 45 && g < 45 && b < 45) {
-            data[i+3] = 0;
-          }
+          if (data[i] < 35 && data[i+1] < 35 && data[i+2] < 35) data[i+3] = 0;
         }
         oCtx.putImageData(imgData, 0, 0);
         skinImageRef.current = offCanvas;
@@ -48,7 +43,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     playerPos: { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 },
     camera: { x: 0, y: 0 },
     playerFacingLeft: false,
-    enemies: [] as (Enemy & { hitFlash?: number, phase?: number })[],
+    enemies: [] as Enemy[],
     bullets: [] as Bullet[],
     gems: [] as Gem[],
     weaponLastShotTimes: {} as Record<string, number>,
@@ -71,7 +66,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    const handleResize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    const handleResize = () => { 
+      canvas.width = window.innerWidth; 
+      canvas.height = window.innerHeight; 
+    };
     window.addEventListener('resize', handleResize);
     handleResize();
 
@@ -80,9 +78,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       if (e.code === 'Space') useSpecial();
     };
     const handleKeyUp = (e: KeyboardEvent) => { gameState.current.keys[e.code] = false; };
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button === 2) useSpecial();
-    };
+    const handleMouseDown = (e: MouseEvent) => { if (e.button === 2) useSpecial(); };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -107,84 +103,44 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
 
   const useSpecial = () => {
     const state = gameState.current;
-    const stats = statsRef.current;
-    if (stats.mana < stats.maxMana) return;
-
+    if (statsRef.current.mana < statsRef.current.maxMana) return;
     onUpdateStats({ mana: 0 });
     playSound('special');
-    state.screenShake = 30;
-
-    if (stats.characterId === 'default' || stats.characterId === 'void') {
-      state.enemies.forEach(e => {
-        const d = Math.hypot(e.x - state.playerPos.x, e.y - state.playerPos.y);
-        if (d < 500) e.hp -= 300;
-      });
-    } else {
-      onUpdateStats({ hp: Math.min(stats.maxHp, stats.hp + 50) });
-    }
+    state.screenShake = 40;
+    state.enemies.forEach(e => {
+      const d = Math.hypot(e.x - state.playerPos.x, e.y - state.playerPos.y);
+      if (d < 700) e.hp -= 600;
+    });
   };
 
   const spawnEnemy = (sw: number, sh: number) => {
     const state = gameState.current;
-    const difficulty = 1 + (state.gameTime / 60);
+    // Zorluk ölçeklendirmesi yumuşatıldı: gameTime / 60 -> 180
+    const difficulty = 1 + (state.gameTime / 180);
     const side = Math.floor(Math.random() * 4);
     let x, y;
-    const margin = 150;
+    const margin = 200;
 
     if (side === 0) { x = state.camera.x + Math.random() * sw; y = state.camera.y - margin; }
     else if (side === 1) { x = state.camera.x + sw + margin; y = state.camera.y + Math.random() * sh; }
     else if (side === 2) { x = state.camera.x + Math.random() * sw; y = state.camera.y + sh + margin; }
     else { x = state.camera.x - margin; y = state.camera.y + Math.random() * sh; }
 
-    const types: EnemyType[] = ['mouse', 'bat', 'bear', 'ghost'];
-    const type = types[Math.floor(Math.random() * Math.min(types.length, 1 + state.gameTime / 45))];
+    const types: EnemyType[] = ['skeleton', 'bat', 'orc', 'vampire'];
+    // Yeni düşmanların gelmesi geciktirildi: /50 -> /120
+    const type = types[Math.floor(Math.random() * Math.min(types.length, 1 + state.gameTime / 120))];
     const base = ENEMY_TYPES[type];
 
     state.enemies.push({
       id: Math.random().toString(),
-      type, x, y, radius: base.radius * (type === 'bear' ? 1.5 : 2),
+      type, x, y, radius: base.radius,
       hp: base.hpBase * difficulty,
       maxHp: base.hpBase * difficulty,
-      speed: base.speed * (1 + state.gameTime / 400), 
+      speed: base.speed * (1 + state.gameTime / 1200), // Hız artışı yavaşlatıldı
       color: base.color,
       damage: base.damage * difficulty, 
-      xpValue: base.xp, hitFlash: 0, phase: Math.random() * Math.PI * 2
+      xpValue: base.xp, hitFlash: 0
     });
-  };
-
-  const fireBullet = (wpn: string) => {
-    const state = gameState.current;
-    const stats = statsRef.current;
-    let target = null;
-    let minDist = 900;
-    state.enemies.forEach(e => {
-      const d = Math.hypot(e.x - state.playerPos.x, e.y - state.playerPos.y);
-      if (d < minDist) { minDist = d; target = e; }
-    });
-    const baseAngle = target ? Math.atan2(target.y - state.playerPos.y, target.x - state.playerPos.x) : (state.playerFacingLeft ? Math.PI : 0);
-
-    for (let i = 0; i < stats.projectileCount; i++) {
-      const angle = baseAngle + (i - (stats.projectileCount - 1) / 2) * 0.2;
-      let bRadius = 8;
-      let bLife = 120;
-      let bColor = COLORS.bullet;
-      
-      if (wpn === 'axe') { bRadius = 22; bColor = '#ff6600'; bLife = 150; }
-      if (wpn === 'beam') { bRadius = 10; bColor = '#00ffff'; bLife = 25; }
-      if (wpn === 'claw') { bRadius = 15; bColor = '#00f3ff'; bLife = 40; }
-      if (wpn === 'orb') { bRadius = 12; bColor = '#ff00ff'; bLife = 200; }
-
-      state.bullets.push({
-        id: Math.random().toString(),
-        x: state.playerPos.x, y: state.playerPos.y,
-        vx: Math.cos(angle) * stats.bulletSpeed, vy: Math.sin(angle) * stats.bulletSpeed,
-        radius: bRadius, damage: stats.damage, penetration: stats.penetration,
-        life: bLife, color: bColor,
-        angle, style: wpn, prevX: state.playerPos.x, prevY: state.playerPos.y,
-        spawnFrame: state.frameCount
-      });
-    }
-    playSound('shoot');
   };
 
   const update = (sw: number, sh: number) => {
@@ -198,7 +154,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       onUpdateStats({ survivalTime: state.gameTime, mana: Math.min(stats.maxMana, stats.mana + 1) });
     }
 
-    // Hareket
     let mx = 0, my = 0;
     if (state.keys['KeyW'] || state.keys['ArrowUp']) my -= 1;
     if (state.keys['KeyS'] || state.keys['ArrowDown']) my += 1;
@@ -214,31 +169,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     state.camera.x = state.playerPos.x - sw / 2;
     state.camera.y = state.playerPos.y - sh / 2;
 
-    const spawnRate = Math.max(6, 60 - state.gameTime / 2);
-    state.spawnTimer++;
-    if (state.spawnTimer > spawnRate) {
-      state.spawnTimer = 0;
-      if (state.enemies.length < 300) spawnEnemy(sw, sh);
-    }
+    // Başlangıç doğuş hızı yavaşlatıldı: 40 -> 70
+    const spawnInterval = Math.max(8, 70 - state.gameTime / 1.5);
+    if (state.frameCount % Math.floor(spawnInterval) === 0 && state.enemies.length < 500) spawnEnemy(sw, sh);
 
     stats.weapons.forEach(wpn => {
       const last = state.weaponLastShotTimes[wpn] || 0;
       if (state.frameCount - last >= stats.fireRate) {
-        fireBullet(wpn);
+        let target = null;
+        let minDist = 1200;
+        state.enemies.forEach(e => {
+          const d = Math.hypot(e.x - state.playerPos.x, e.y - state.playerPos.y);
+          if (d < minDist) { minDist = d; target = e; }
+        });
+        const angle = target ? Math.atan2(target.y - state.playerPos.y, target.x - state.playerPos.x) : (state.playerFacingLeft ? Math.PI : 0);
+        
+        for (let i = 0; i < stats.projectileCount; i++) {
+          const spread = angle + (i - (stats.projectileCount - 1) / 2) * 0.12;
+          state.bullets.push({
+            id: Math.random().toString(),
+            x: state.playerPos.x, y: state.playerPos.y,
+            vx: Math.cos(spread) * stats.bulletSpeed, vy: Math.sin(spread) * stats.bulletSpeed,
+            radius: wpn === 'axe' ? 32 : wpn === 'orb' ? 18 : 12, 
+            damage: stats.damage, penetration: stats.penetration,
+            life: wpn === 'beam' ? 25 : 200, 
+            color: wpn === 'axe' ? '#ea580c' : wpn === 'beam' ? '#06b6d4' : wpn === 'orb' ? '#d946ef' : COLORS.bullet,
+            angle: spread, style: wpn, spawnFrame: state.frameCount
+          });
+        }
         state.weaponLastShotTimes[wpn] = state.frameCount;
+        playSound('shoot');
       }
     });
 
     for (let i = state.bullets.length - 1; i >= 0; i--) {
       const b = state.bullets[i];
-      b.prevX = b.x; b.prevY = b.y;
-      
-      if (b.style === 'axe') {
-        b.angle += 0.2; // Dönme efekti
-      }
-      
-      b.x += b.vx; b.y += b.vy;
-      b.life--;
+      if (b.style === 'axe') b.angle += 0.3;
+      b.x += b.vx; b.y += b.vy; b.life--;
       if (b.life <= 0) { state.bullets.splice(i, 1); continue; }
 
       for (let j = state.enemies.length - 1; j >= 0; j--) {
@@ -248,8 +215,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
           playSound('hit');
           if (e.hp <= 0) {
             state.enemies.splice(j, 1);
-            state.gems.push({ id: Math.random().toString(), x: e.x, y: e.y, type: 'xp', value: e.xpValue, color: COLORS.gem, radius: 6, vx: 0, vy: 0 });
-            onUpdateStats({ killCount: statsRef.current.killCount + 1, mana: Math.min(stats.maxMana, stats.mana + 4) });
+            onUpdateStats({ killCount: statsRef.current.killCount + 1, mana: Math.min(stats.maxMana, stats.mana + 5) });
+            const rnd = Math.random();
+            let gType: GemType = 'xp';
+            let color = COLORS.gem;
+            if (rnd < PICKUP_CHANCES.health) { gType = 'health'; color = COLORS.health; }
+            else if (rnd < PICKUP_CHANCES.magnet) { gType = 'magnet'; color = COLORS.magnet; }
+            else if (rnd < PICKUP_CHANCES.bomb) { gType = 'bomb'; color = COLORS.bomb; }
+            state.gems.push({ id: Math.random().toString(), x: e.x, y: e.y, type: gType, value: e.xpValue, color, radius: 9, vx: 0, vy: 0 });
             playSound('kill');
           }
           if (b.penetration <= 0) { state.bullets.splice(i, 1); break; }
@@ -263,9 +236,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       const angle = Math.atan2(state.playerPos.y - e.y, state.playerPos.x - e.x);
       e.x += Math.cos(angle) * e.speed;
       e.y += Math.sin(angle) * e.speed;
-      if (Math.hypot(e.x - state.playerPos.x, e.y - state.playerPos.y) < e.radius + 15) {
+      if (Math.hypot(e.x - state.playerPos.x, e.y - state.playerPos.y) < e.radius + 20) {
         onUpdateStats({ hp: Math.max(0, stats.hp - e.damage) });
-        state.screenShake = 10; state.enemies.splice(i, 1);
+        state.screenShake = 20; state.enemies.splice(i, 1);
         playSound('hurt');
         if (stats.hp <= 0) onGameOver();
       }
@@ -274,14 +247,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     for (let i = state.gems.length - 1; i >= 0; i--) {
       const g = state.gems[i];
       const d = Math.hypot(g.x - state.playerPos.x, g.y - state.playerPos.y);
-      if (d < 250) {
+      if (d < 350) {
         const angle = Math.atan2(state.playerPos.y - g.y, state.playerPos.x - g.x);
         g.x += Math.cos(angle) * 18; g.y += Math.sin(angle) * 18;
       }
-      if (d < 35) {
-        const nextXp = stats.xp + g.value;
-        if (nextXp >= stats.xpToNextLevel) { state.isLevelingUp = true; onLevelUp(); }
-        else onUpdateStats({ xp: nextXp });
+      if (d < 50) {
+        if (g.type === 'health') onUpdateStats({ hp: Math.min(stats.maxHp, stats.hp + 35) });
+        else if (g.type === 'magnet') state.gems.forEach(o => { if (o.type === 'xp') { o.x = state.playerPos.x; o.y = state.playerPos.y; } });
+        else if (g.type === 'bomb') { state.enemies.forEach(e => { e.hp -= 300; e.hitFlash = 5; }); state.screenShake = 30; }
+        else {
+          const nextXp = stats.xp + g.value;
+          if (nextXp >= stats.xpToNextLevel) { state.isLevelingUp = true; onLevelUp(); }
+          else onUpdateStats({ xp: nextXp });
+        }
         state.gems.splice(i, 1); playSound('xp');
       }
     }
@@ -295,56 +273,42 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     ctx.save();
     if (state.screenShake > 0) {
       ctx.translate((Math.random()-0.5)*state.screenShake, (Math.random()-0.5)*state.screenShake);
-      state.screenShake *= 0.9;
+      state.screenShake *= 0.85;
     }
 
     ctx.fillStyle = COLORS.background; ctx.fillRect(0, 0, sw, sh);
-
-    // Izgara
-    ctx.strokeStyle = '#0d0d2b'; ctx.lineWidth = 2; ctx.beginPath();
-    for (let x = -cam.x % 150; x < sw; x += 150) { ctx.moveTo(x, 0); ctx.lineTo(x, sh); }
-    for (let y = -cam.y % 150; y < sh; y += 150) { ctx.moveTo(0, y); ctx.lineTo(sw, y); }
+    ctx.strokeStyle = '#0d0d21'; ctx.lineWidth = 1; ctx.beginPath();
+    const grid = 200;
+    for (let x = -cam.x % grid; x < sw; x += grid) { ctx.moveTo(x, 0); ctx.lineTo(x, sh); }
+    for (let y = -cam.y % grid; y < sh; y += grid) { ctx.moveTo(0, y); ctx.lineTo(sw, y); }
     ctx.stroke();
 
     state.gems.forEach(g => {
-      ctx.shadowBlur = 10; ctx.shadowColor = g.color; ctx.fillStyle = g.color;
+      ctx.shadowBlur = 15; ctx.shadowColor = g.color; ctx.fillStyle = g.color;
       ctx.beginPath(); ctx.arc(g.x - cam.x, g.y - cam.y, g.radius, 0, Math.PI*2); ctx.fill();
     });
 
-    // Mermi Çizimleri (Geliştirilmiş)
     state.bullets.forEach(b => {
       ctx.save();
       ctx.translate(b.x - cam.x, b.y - cam.y);
       ctx.rotate(b.angle);
       ctx.shadowBlur = 20; ctx.shadowColor = b.color;
       ctx.fillStyle = b.color;
-      
       if (b.style === 'claw') {
-        const anim = Math.sin(state.frameCount * 0.3) * 5;
         ctx.beginPath();
-        // Üçlü pençe izi
-        for(let offset of [-8, 0, 8]) {
-          ctx.moveTo(-b.radius, offset);
-          ctx.quadraticCurveTo(0, offset + anim, b.radius, offset);
-        }
+        for(let off of [-8, 0, 8]) { ctx.moveTo(-15, off); ctx.quadraticCurveTo(8, off + Math.sin(state.frameCount*0.3)*6, 15, off); }
         ctx.lineWidth = 4; ctx.strokeStyle = b.color; ctx.lineCap = 'round'; ctx.stroke();
       } else if (b.style === 'axe') {
-        // Balta formu
-        ctx.beginPath();
-        ctx.moveTo(-15, -15); ctx.lineTo(15, 0); ctx.lineTo(-15, 15);
-        ctx.closePath(); ctx.fill();
-        ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-22,-22); ctx.lineTo(22,0); ctx.lineTo(-22,22); ctx.closePath(); ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       } else if (b.style === 'beam') {
-        const pulse = Math.sin(state.frameCount * 0.5) * 4 + 8;
-        ctx.globalAlpha = 0.8;
-        ctx.fillRect(-60, -pulse/2, 120, pulse);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(-60, -pulse/4, 120, pulse/2);
+        const p = Math.sin(state.frameCount * 0.4) * 6 + 12;
+        ctx.fillRect(-100, -p/2, 200, p);
+        ctx.fillStyle = '#fff'; ctx.fillRect(-100, -p/4, 200, p/2);
       } else if (b.style === 'orb') {
-        const pulse = Math.sin(state.frameCount * 0.2) * 3;
-        ctx.beginPath(); ctx.arc(0, 0, b.radius + pulse, 0, Math.PI*2); ctx.fill();
-        ctx.globalAlpha = 0.3;
-        ctx.beginPath(); ctx.arc(0, 0, b.radius * 2, 0, Math.PI*2); ctx.fill();
+        const p = Math.sin(state.frameCount * 0.2) * 5;
+        ctx.beginPath(); ctx.arc(0, 0, b.radius + p, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(0, 0, b.radius*2.2, 0, Math.PI*2); ctx.fill();
       } else {
         ctx.beginPath(); ctx.arc(0, 0, b.radius, 0, Math.PI*2); ctx.fill();
       }
@@ -353,55 +317,49 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
 
     state.enemies.forEach(e => {
       const ex = e.x - cam.x, ey = e.y - cam.y;
+      if (ex < -100 || ex > sw + 100 || ey < -100 || ey > sh + 100) return;
       ctx.save();
       ctx.translate(ex, ey);
-      ctx.shadowBlur = 20; ctx.shadowColor = e.color;
-      ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
+      ctx.shadowBlur = 15; ctx.shadowColor = e.color;
+      ctx.fillStyle = e.hitFlash ? '#fff' : e.color;
       
-      if (e.type === 'mouse') {
-        ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-e.radius/2, -e.radius/3, 3, 0, Math.PI*2); ctx.arc(e.radius/2, -e.radius/3, 3, 0, Math.PI*2); ctx.fill();
-      } else if (e.type === 'bat') {
-        const flap = Math.sin(state.frameCount * 0.25) * e.radius;
-        ctx.beginPath(); ctx.moveTo(-e.radius - flap, -flap); ctx.lineTo(0, 0); ctx.lineTo(e.radius + flap, -flap); ctx.lineWidth = 3; ctx.strokeStyle = e.color; ctx.stroke();
-        ctx.beginPath(); ctx.arc(0, 0, e.radius/1.5, 0, Math.PI*2); ctx.fill();
-      } else if (e.type === 'bear') {
-        ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-e.radius/3, -e.radius/4, 4, 0, Math.PI*2); ctx.arc(e.radius/3, -e.radius/4, 4, 0, Math.PI*2); ctx.fill();
+      const anim = Math.sin(state.frameCount * 0.1) * 2;
+      
+      if (e.type === 'skeleton') {
+        ctx.beginPath(); ctx.arc(0, -e.radius/2 + anim, e.radius/1.4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-e.radius/3, -e.radius/2 + anim, 3, 0, Math.PI*2); ctx.arc(e.radius/3, -e.radius/2 + anim, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = e.hitFlash ? '#fff' : e.color;
+        for(let i=0; i<3; i++) ctx.fillRect(-e.radius/1.5, i*7 + anim, e.radius*1.3, 3);
+      } else if (e.type === 'orc') {
+        ctx.beginPath(); ctx.arc(0, anim, e.radius, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#1f2937'; ctx.fillRect(-e.radius, -e.radius/3 + anim, e.radius*2, 12);
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-e.radius/2, 8+anim); ctx.lineTo(-e.radius/1.5, 18+anim); ctx.lineTo(-e.radius/4, 12+anim); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(e.radius/2, 8+anim); ctx.lineTo(e.radius/1.5, 18+anim); ctx.lineTo(e.radius/4, 12+anim); ctx.fill();
+      } else if (e.type === 'vampire') {
+        ctx.beginPath(); ctx.moveTo(-e.radius*1.2, -e.radius+anim); ctx.lineTo(0, e.radius*1.5+anim); ctx.lineTo(e.radius*1.2, -e.radius+anim); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#f3f4f6'; ctx.beginPath(); ctx.arc(0, -e.radius/1.5+anim, e.radius/1.8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(-e.radius/5, -e.radius/1.5+anim, 2.5, 0, Math.PI*2); ctx.arc(e.radius/5, -e.radius/1.5+anim, 2.5, 0, Math.PI*2); ctx.fill();
       } else {
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI*2); ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+        const flap = Math.sin(state.frameCount * 0.4) * e.radius;
+        ctx.beginPath(); ctx.moveTo(-e.radius - flap, -flap + anim); ctx.lineTo(0, anim); ctx.lineTo(e.radius + flap, -flap + anim); ctx.lineWidth = 4; ctx.strokeStyle = e.color; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, anim, e.radius/1.2, 0, Math.PI*2); ctx.fill();
       }
       ctx.restore();
-      
-      if (e.hp < e.maxHp) {
-        ctx.fillStyle = '#111'; ctx.fillRect(ex - e.radius, ey - e.radius - 12, e.radius*2, 5);
-        ctx.fillStyle = '#ff3300'; ctx.fillRect(ex - e.radius, ey - e.radius - 12, (e.radius*2) * (e.hp/e.maxHp), 5);
-      }
     });
 
     const px = state.playerPos.x - cam.x, py = state.playerPos.y - cam.y;
     ctx.save();
     ctx.translate(px, py);
     if (state.playerFacingLeft) ctx.scale(-1, 1);
-    
+    ctx.shadowBlur = 45; ctx.shadowColor = stats.color;
     if (skinImageRef.current) {
-      ctx.shadowBlur = 45; ctx.shadowColor = stats.color;
-      ctx.drawImage(skinImageRef.current, -50, -50, 100, 100);
+      ctx.drawImage(skinImageRef.current, -60, -60, 120, 120);
     } else {
-      ctx.shadowBlur = 45; ctx.shadowColor = stats.color;
-      // Procedural Neon Cat
-      ctx.fillStyle = stats.color;
-      ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.fill();
-      // Ears
-      ctx.beginPath(); ctx.moveTo(-20, -15); ctx.lineTo(-25, -35); ctx.lineTo(-5, -25); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(25, -35); ctx.lineTo(5, -25); ctx.fill();
-      // Eyes
-      ctx.fillStyle = '#000';
-      ctx.beginPath(); ctx.arc(-8, -5, 5, 0, Math.PI*2); ctx.arc(8, -5, 5, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(-7, -6, 2, 0, Math.PI*2); ctx.arc(9, -6, 2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = stats.color; ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-22,-10); ctx.lineTo(-32,-40); ctx.lineTo(-6,-22); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(22,-10); ctx.lineTo(32,-40); ctx.lineTo(6,-22); ctx.fill();
+      ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-10, -8, 6, 0, Math.PI*2); ctx.arc(10, -8, 6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-8, -10, 2.5, 0, Math.PI*2); ctx.arc(12, -10, 2.5, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
     ctx.restore();

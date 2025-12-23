@@ -1,8 +1,6 @@
 
 import { UpgradeOption, EnemyType, Character, PlayerStats } from './types';
 
-export const CANVAS_WIDTH = window.innerWidth;
-export const CANVAS_HEIGHT = window.innerHeight;
 export const MAP_WIDTH = 4000;
 export const MAP_HEIGHT = 4000;
 
@@ -11,21 +9,20 @@ export const INITIAL_PLAYER_STATS: PlayerStats = {
   maxHp: 100,
   mana: 0,
   maxMana: 100,
-  speed: 4.5, 
-  damage: 15,
-  fireRate: 40, 
-  bulletSpeed: 9,
+  speed: 4.8, 
+  damage: 25, // Hasar artırıldı
+  fireRate: 45, 
+  bulletSpeed: 10,
   penetration: 1,
   projectileCount: 1, 
   level: 1,
   xp: 0,
-  xpToNextLevel: 50,
+  xpToNextLevel: 100,
   killCount: 0,
   survivalTime: 0,
   characterId: 'default',
   color: '#00f3ff',
   weapons: ['claw'], 
-  
   hasAura: false,
   auraRadius: 100,
   auraDamage: 0.5, 
@@ -43,142 +40,80 @@ export const COLORS = {
   health: '#ff0033', 
   mana: '#00ccff', 
   text: '#ffffff',
-  grid: '#1a1a2e',
   magnet: '#00aaff',
-  bomb: '#ffaa00',
-  freeze: '#00ffff'
+  bomb: '#ffaa00'
 };
 
-export const HEALTH_DROP_CHANCE = 0.015; 
-export const POWERUP_DROP_CHANCE = 0.005; // Mıknatıs, Bomba, Donma gibi nadir eşyalar
-export const HEALTH_DROP_AMOUNT = 25;
+export const PICKUP_CHANCES = {
+  health: 0.02,
+  magnet: 0.01,
+  bomb: 0.007
+};
 
 export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpBase: number, damage: number, speed: number, xp: number }> = {
-  mouse: { color: '#a0a0a0', radius: 12, hpBase: 10, damage: 5, speed: 3.5, xp: 5 },
-  bear: { color: '#8b4513', radius: 24, hpBase: 60, damage: 15, speed: 1.8, xp: 20 },
-  bat: { color: '#9d00ff', radius: 10, hpBase: 15, damage: 8, speed: 4.5, xp: 12 },
-  ghost: { color: '#ffffff', radius: 20, hpBase: 150, damage: 25, speed: 1.2, xp: 100 }
+  skeleton: { color: '#f8fafc', radius: 16, hpBase: 15, damage: 5, speed: 2.2, xp: 12 }, // HP 30 -> 15
+  orc: { color: '#166534', radius: 26, hpBase: 80, damage: 15, speed: 1.4, xp: 45 },    // HP 140 -> 80
+  vampire: { color: '#b91c1c', radius: 19, hpBase: 35, damage: 12, speed: 3.5, xp: 30 }, // HP 55 -> 35
+  bat: { color: '#6d28d9', radius: 11, hpBase: 8, damage: 4, speed: 4.8, xp: 8 }        // HP 12 -> 8
 };
 
 export const CHARACTERS: Character[] = [
   {
     id: 'default',
-    name: 'Neon Cat',
-    description: 'Dengeli başlangıç karakteri.',
+    name: 'Cyber Cat',
+    description: 'Hızlı ve dengeli bir başlangıç.',
     unlockCondition: 'Varsayılan',
     isUnlocked: () => true,
-    baseStats: { weapons: ['claw'] },
+    baseStats: { weapons: ['claw'], speed: 5.2 },
     color: '#00f3ff', 
     icon: '🐱',
-    specialName: 'SUPER NOVA',
-    specialDescription: 'Ekrandaki tüm düşmanları anında yok eder.'
+    specialName: 'NEON WAVE',
+    specialDescription: 'Geniş alanda şok dalgası.'
   },
   {
-    id: 'blitz',
-    name: 'Blitz',
-    description: 'Çok hızlı ama kırılgan.',
-    unlockCondition: 'Seviye 5+',
-    isUnlocked: (data) => data.maxLevel >= 5,
-    baseStats: {
-      speed: 6.5,
-      fireRate: 30,
-      maxHp: 60,
-      hp: 60,
-      weapons: ['orb']
-    },
-    color: '#ffaa00', 
-    icon: '⚡',
-    specialName: 'TIME FREEZE',
-    specialDescription: '5 saniye boyunca zamanı dondurur.'
+    id: 'ranger',
+    name: 'Phantom',
+    description: 'Uzun menzilli lazer uzmanı.',
+    unlockCondition: 'Keskin',
+    isUnlocked: () => true,
+    baseStats: { weapons: ['beam'], damage: 25, bulletSpeed: 14 },
+    color: '#fbbf24', 
+    icon: '🏹',
+    specialName: 'STORM OF LIGHT',
+    specialDescription: 'Tüm mermiler 5 sn delici olur.'
   },
   {
-    id: 'chonk',
-    name: 'Chonk',
-    description: 'Yavaş, çok canı var, çoklu atar.',
-    unlockCondition: '250 Toplam Leş',
-    isUnlocked: (data) => data.totalKills >= 250,
-    baseStats: {
-      speed: 3.0,
-      maxHp: 200,
-      hp: 200,
-      projectileCount: 2,
-      damage: 10,
-      weapons: ['axe']
-    },
-    color: '#00ff00', 
-    icon: '🐅',
-    specialName: 'IRON SKIN',
-    specialDescription: '8 saniye boyunca ölümsüz olur.'
-  },
-  {
-    id: 'void',
-    name: 'Void Walker',
-    description: 'Yüksek hasar, delici atışlar.',
-    unlockCondition: '120sn Hayatta Kal',
-    isUnlocked: (data) => data.longestRun >= 120,
-    baseStats: {
-      damage: 25,
-      fireRate: 60,
-      bulletSpeed: 12,
-      penetration: 3,
-      weapons: ['beam'],
-      color: '#aa00ff'
-    },
-    color: '#aa00ff', 
+    id: 'witch',
+    name: 'Eldritch',
+    description: 'Büyü küreleri ile savunma.',
+    unlockCondition: 'Mistik',
+    isUnlocked: () => true,
+    baseStats: { weapons: ['orb'], maxMana: 150 },
+    color: '#a855f7', 
     icon: '🔮',
-    specialName: 'BLACK HOLE',
-    specialDescription: 'Düşmanları yutan bir kara delik açar.'
+    specialName: 'VOID REACH',
+    specialDescription: 'Tüm düşmanları kendine çeker ve patlatır.'
   },
   {
-    id: 'ghost',
-    name: 'Ghost Cat',
-    description: 'Hızlı ve ele geçmez.',
-    unlockCondition: '300sn Hayatta Kal',
-    isUnlocked: (data) => data.longestRun >= 300,
-    baseStats: {
-      speed: 5.5,
-      weapons: ['spiral'],
-      damage: 12,
-    },
-    color: '#ffffff',
-    icon: '👻',
-    specialName: 'PHASE SHIFT',
-    specialDescription: '6s ölümsüzlük ve temas hasarı sağlar.'
-  },
-  {
-    id: 'mech',
-    name: 'Mech Cat',
-    description: 'Ağır zırhlı ve teknolojik.',
-    unlockCondition: '1000 Toplam Leş',
-    isUnlocked: (data) => data.totalKills >= 1000,
-    baseStats: {
-      maxHp: 150,
-      hp: 150,
-      speed: 3.5,
-      weapons: ['beam', 'orb'],
-      fireRate: 45,
-    },
-    color: '#ff0055',
-    icon: '🤖',
-    specialName: 'OVERDRIVE',
-    specialDescription: '8s boyunca hızı ve atış hızını 3 katına çıkarır.'
+    id: 'heavy',
+    name: 'Vanguard',
+    description: 'Dönen baltalar ve yüksek can.',
+    unlockCondition: 'Dayanıklı',
+    isUnlocked: () => true,
+    baseStats: { hp: 250, maxHp: 250, weapons: ['axe'], speed: 3.8 },
+    color: '#f43f5e', 
+    icon: '🛡️',
+    specialName: 'TITAN WALL',
+    specialDescription: 'Gecici süre hasar almaz.'
   }
 ];
 
 export const UPGRADE_POOL: UpgradeOption[] = [
-  { id: 'dmg_1', title: 'Keskin Pençeler', description: 'Hasarı %20 artırır.', type: 'damage', value: 0.2, icon: '💅', rarity: 'common' },
-  { id: 'spd_1', title: 'Kedi Refleksleri', description: 'Hareket hızını %10 artırır.', type: 'speed', value: 0.10, icon: '⚡', rarity: 'common' },
-  { id: 'rate_1', title: 'Öfke Nöbeti', description: 'Saldırı hızını %10 artırır.', type: 'fireRate', value: 0.10, icon: '😤', rarity: 'common' },
-  { id: 'bspd_1', title: 'Hızlı Savuruş', description: 'Mermi hızını %25 artırır.', type: 'bulletSpeed', value: 0.25, icon: '🌪️', rarity: 'common' },
-  { id: 'pen_1', title: 'Ruh Delen', description: 'Mermiler +1 düşman daha delip geçer.', type: 'penetration', value: 1, icon: '👻', rarity: 'rare' },
-  { id: 'heal_1', title: 'Dokuz Can', description: 'Canını 30 puan iyileştirir.', type: 'heal', value: 30, icon: '❤️', rarity: 'common' },
-  { id: 'dmg_2', title: 'Kadim Kedi Ruhu', description: 'Hasarı %50 artırır!', type: 'damage', value: 0.5, icon: '🦁', rarity: 'legendary' },
-  { id: 'multi_1', title: 'Çift Pençe', description: 'Aynı anda +1 mermi daha atarsın.', type: 'multishot', value: 1, icon: '🔱', rarity: 'rare' },
-  { id: 'wpn_orb', title: 'Enerji Küresi', description: 'Arsenaline Enerji Küresi ekler.', type: 'weapon', value: 'orb', icon: '🔵', rarity: 'legendary' },
-  { id: 'wpn_beam', title: 'Lazer Işını', description: 'Arsenaline Lazer Işını ekler.', type: 'weapon', value: 'beam', icon: '🔦', rarity: 'legendary' },
-  { id: 'wpn_axe', title: 'Savaş Baltası', description: 'Arsenaline Savaş Baltası ekler.', type: 'weapon', value: 'axe', icon: '🪓', rarity: 'legendary' },
-  { id: 'wpn_boom', title: 'Bumerang', description: 'Arsenaline Bumerang ekler.', type: 'weapon', value: 'boomerang', icon: '🪃', rarity: 'legendary' },
-  { id: 'wpn_spiral', title: 'Yıldız Yağmuru', description: 'Arsenaline Yıldız Yağmuru ekler.', type: 'weapon', value: 'spiral', icon: '🌟', rarity: 'legendary' },
-  { id: 'aura_1', title: 'Sarımsak Aurası', description: 'Etrafında hasar veren bir alan oluşturur.', type: 'aura', value: 1, icon: '🧄', rarity: 'rare' },
-  { id: 'orbital_1', title: 'Koruyucu Kitap', description: 'Etrafında dönen koruyucu bir cisim ekler.', type: 'orbital', value: 1, icon: '📘', rarity: 'rare' },
+  { id: 'dmg_1', title: 'Güç Çekirdeği', description: 'Hasar %20 artar.', type: 'damage', value: 0.2, icon: '💥', rarity: 'common' },
+  { id: 'spd_1', title: 'Hız Modülü', description: 'Hız %15 artar.', type: 'speed', value: 0.15, icon: '🏃', rarity: 'common' },
+  { id: 'wpn_axe', title: 'Siber Balta', description: 'Dönen bir balta ekle.', type: 'weapon', value: 'axe', icon: '🪓', rarity: 'rare' },
+  { id: 'wpn_beam', title: 'Foton Işını', description: 'Delici bir lazer ekle.', type: 'weapon', value: 'beam', icon: '🔦', rarity: 'legendary' },
+  { id: 'wpn_orb', title: 'Plazma Küresi', description: 'Enerji küresi ekle.', type: 'weapon', value: 'orb', icon: '🔮', rarity: 'rare' },
+  { id: 'multi_1', title: 'Mermi Çoğaltıcı', description: 'Mermi sayısı +1.', type: 'multishot', value: 1, icon: '🔱', rarity: 'rare' },
+  { id: 'heal_1', title: 'Tamir Kiti', description: '40 Can doldur.', type: 'heal', value: 40, icon: '🔧', rarity: 'common' },
 ];

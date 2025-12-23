@@ -4,7 +4,8 @@ export enum GameStatus {
   PLAYING = 'PLAYING',
   LEVEL_UP = 'LEVEL_UP',
   PAUSED_MANUAL = 'PAUSED_MANUAL',
-  GAME_OVER = 'GAME_OVER'
+  GAME_OVER = 'GAME_OVER',
+  STUDIO = 'STUDIO'
 }
 
 export interface PlayerStats {
@@ -27,7 +28,7 @@ export interface PlayerStats {
   characterId: string;
   color: string;
   weapons: string[]; 
-  customSkinUrl?: string; // AI tarafından üretilen skin için url
+  customSkinUrl?: string;
   
   hasAura: boolean;
   auraRadius: number;
@@ -49,7 +50,7 @@ export interface Entity extends Position {
   radius: number;
 }
 
-export type EnemyType = 'mouse' | 'bear' | 'bat' | 'ghost';
+export type EnemyType = 'skeleton' | 'orc' | 'vampire' | 'bat';
 
 export interface Enemy extends Entity {
   type: EnemyType;
@@ -59,7 +60,7 @@ export interface Enemy extends Entity {
   color: string;
   damage: number;
   xpValue: number;
-  wobbleOffset?: number;
+  hitFlash?: number;
 }
 
 export interface Bullet extends Entity {
@@ -71,25 +72,15 @@ export interface Bullet extends Entity {
   color: string;
   angle: number;
   style: string;
-  initialVx?: number; 
-  initialVy?: number;
   spawnFrame?: number;
   prevX?: number;
   prevY?: number;
 }
 
-export interface Particle extends Position {
-  id: string;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  color: string;
-  radius: number;
-}
+export type GemType = 'xp' | 'health' | 'magnet' | 'bomb';
 
 export interface Gem extends Entity {
-  type: 'xp' | 'health' | 'magnet' | 'bomb' | 'freeze';
+  type: GemType;
   value: number;
   color: string;
   vx: number;
@@ -107,18 +98,12 @@ export interface UpgradeOption {
   rarity: 'common' | 'rare' | 'legendary';
 }
 
-export interface PersistentData {
-  totalKills: number;
-  maxLevel: number;
-  longestRun: number;
-}
-
 export interface Character {
   id: string;
   name: string;
   description: string;
   unlockCondition: string;
-  isUnlocked: (data: PersistentData) => boolean;
+  isUnlocked: (data: any) => boolean;
   baseStats: Partial<PlayerStats>;
   color: string;
   icon: string;

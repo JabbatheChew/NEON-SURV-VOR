@@ -5,8 +5,8 @@ import GameCanvas from './components/GameCanvas';
 import HUD from './components/HUD';
 import LevelUpModal from './components/LevelUpModal';
 import GameOverModal from './components/GameOverModal';
-import { GameStatus, PlayerStats, UpgradeOption } from './types';
-import { INITIAL_PLAYER_STATS, UPGRADE_POOL, CHARACTERS } from './constants';
+import { GameStatus, PlayerStats, UpgradeOption, Character } from './types';
+import { INITIAL_PLAYER_STATS, UPGRADE_POOL, CHARACTERS as STATIC_CHARACTERS } from './constants';
 import { playSound, toggleMute } from './utils/SoundManager';
 
 const App: React.FC = () => {
@@ -14,192 +14,280 @@ const App: React.FC = () => {
   const [playerStats, setPlayerStats] = useState<PlayerStats>({ ...INITIAL_PLAYER_STATS });
   const [upgradeOptions, setUpgradeOptions] = useState<UpgradeOption[]>([]);
   const [gameId, setGameId] = useState(0);
+  const [characters, setCharacters] = useState<Character[]>([...STATIC_CHARACTERS]);
   const [selectedCharId, setSelectedCharId] = useState<string>('default');
   const [customSkins, setCustomSkins] = useState<Record<string, string>>({});
   const [isMuted, setIsMuted] = useState(false);
   
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  // AI States
+  const [studioTab, setStudioTab] = useState<'flash' | 'pro' | 'veo'>('flash');
+  const [aiPrompt, setAiPrompt] = useState('A neon cyberpunk warrior cat, top-down game sprite');
+  const [aiSize, setAiSize] = useState<'1K' | '2K' | '4K'>('1K');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [veoVideoUrl, setVeoVideoUrl] = useState<string | null>(null);
+  const [lastGeneratedUrl, setLastGeneratedUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleGlobalKey = (e: KeyboardEvent) => {
+    const handleKey = (e: KeyboardEvent) => { 
       if (e.code === 'Escape') {
         if (status === GameStatus.PLAYING) setStatus(GameStatus.PAUSED_MANUAL);
         else if (status === GameStatus.PAUSED_MANUAL) setStatus(GameStatus.PLAYING);
+        else if (status === GameStatus.STUDIO) setStatus(GameStatus.MENU);
       }
     };
-    window.addEventListener('keydown', handleGlobalKey);
-    return () => window.removeEventListener('keydown', handleGlobalKey);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
   }, [status]);
 
-  const handleToggleMute = () => {
-    setIsMuted(toggleMute());
-  };
-
-  const startGame = () => {
-    const char = CHARACTERS.find(c => c.id === selectedCharId) || CHARACTERS[0];
-    setPlayerStats({ 
-      ...INITIAL_PLAYER_STATS, 
-      ...char.baseStats, 
-      color: char.color, 
-      characterId: char.id, 
-      weapons: char.baseStats.weapons || ['claw'],
-      customSkinUrl: customSkins[char.id],
-      xp: 0,
-      level: 1,
-      xpToNextLevel: 100,
-      fireRate: 60, 
-      mana: 0,
+  const handleLevelUp = useCallback(() => {
+    // Rastgele 3 seçenek seç (Oyuncunun sahip olmadığı silahları önceliklendir veya istatistikleri sun)
+    const availableUpgrades = UPGRADE_POOL.filter(upgrade => {
+      if (upgrade.type === 'weapon') {
+        return !playerStats.weapons.includes(upgrade.value as string);
+      }
+      return true;
     });
-    setGameId(prev => prev + 1);
-    setStatus(GameStatus.PLAYING);
-    playSound('start');
+
+    // Karıştır ve ilk 3'ü al
+    const shuffled = [...availableUpgrades].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 3);
+    
+    setUpgradeOptions(selected);
+    setStatus(GameStatus.LEVEL_UP);
+    playSound('levelup');
+  }, [playerStats.weapons]);
+
+  const handleAiError = async (e: any) => {
+    console.error(e);
+    if (e.message?.includes("not found") || e.message?.includes("key")) {
+      await window.aistudio.openSelectKey();
+    } else {
+      alert("AI Hatası: " + e.message);
+    }
   };
 
-  const generateAiSkin = async () => {
+  const generateFlashImage = async () => {
     if (!aiPrompt) return;
-    setIsAiGenerating(true);
+    setIsAiLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: `A circular top-down futuristic cyberpunk game character sprite for "${aiPrompt}". Symmetrical, vibrant colors, neon glows, flat black background, high quality digital art.` }] }
+        contents: { parts: [{ text: `High-quality top-down 2D game sprite of: ${aiPrompt}. Isolated on black, vibrant neon colors.` }] }
       });
-
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
-          const skinUrl = `data:image/png;base64,${part.inlineData.data}`;
-          setCustomSkins(prev => ({ ...prev, [selectedCharId]: skinUrl }));
+          const url = `data:image/png;base64,${part.inlineData.data}`;
+          setLastGeneratedUrl(url);
+          setCustomSkins(prev => ({ ...prev, [selectedCharId]: url }));
           break;
         }
       }
-      setIsAiModalOpen(false);
-    } catch (e) {
-      console.error(e);
-      alert("AI üretimi başarısız oldu.");
-    } finally {
-      setIsAiGenerating(false);
-    }
+    } catch (e) { await handleAiError(e); } finally { setIsAiLoading(false); }
   };
 
-  const handleLevelUp = useCallback(() => {
-    const pool = [...UPGRADE_POOL];
-    const selected: UpgradeOption[] = [];
-    while (selected.length < 3 && pool.length > 0) {
-      const idx = Math.floor(Math.random() * pool.length);
-      selected.push(pool.splice(idx, 1)[0]);
-    }
-    setUpgradeOptions(selected);
-    setStatus(GameStatus.LEVEL_UP);
-    playSound('levelup');
-  }, []);
-
-  const handleApplyUpgrade = useCallback((option: UpgradeOption) => {
-    setPlayerStats(prev => {
-      const next = { ...prev };
-      next.level += 1;
-      next.xp = 0;
-      next.xpToNextLevel = Math.floor(prev.xpToNextLevel * 1.4);
-
-      const val = typeof option.value === 'number' ? option.value : 0;
-      switch (option.type) {
-        case 'damage': next.damage *= (1 + val); break;
-        case 'speed': next.speed += val; break;
-        case 'fireRate': next.fireRate = Math.max(15, Math.floor(next.fireRate * (1 - val))); break;
-        case 'bulletSpeed': next.bulletSpeed += val; break;
-        case 'heal': next.hp = Math.min(next.maxHp, next.hp + val); break;
-        case 'multishot': next.projectileCount += val; break;
-        case 'weapon': 
-          if (typeof option.value === 'string' && !next.weapons.includes(option.value)) {
-            next.weapons = [...next.weapons, option.value];
-          }
-          break;
+  const generateProOrVeo = async () => {
+    setIsAiLoading(true);
+    try {
+      if (!(await window.aistudio.hasSelectedApiKey())) {
+        await window.aistudio.openSelectKey();
       }
-      return next;
-    });
-    setStatus(GameStatus.PLAYING);
-    playSound('upgrade');
-  }, []);
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      if (studioTab === 'pro') {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-pro-image-preview',
+          contents: { parts: [{ text: `Professional 4K game asset, top-down view: ${aiPrompt}. Black background, cinematic lighting.` }] },
+          config: { imageConfig: { imageSize: aiSize, aspectRatio: "1:1" } }
+        });
+        const part = response.candidates[0].content.parts.find(p => p.inlineData);
+        if (part?.inlineData) {
+          const url = `data:image/png;base64,${part.inlineData.data}`;
+          setLastGeneratedUrl(url);
+          setCustomSkins(prev => ({ ...prev, [selectedCharId]: url }));
+        }
+      } else {
+        const skin = lastGeneratedUrl || customSkins[selectedCharId];
+        if (!skin) throw new Error("Önce bir görsel üretmelisin!");
+        let op = await ai.models.generateVideos({
+          model: 'veo-3.1-fast-generate-preview',
+          prompt: `Cinematic neon animation of: ${aiPrompt}`,
+          image: { imageBytes: skin.split(',')[1], mimeType: 'image/png' },
+          config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '16:9' }
+        });
+        while (!op.done) { 
+          await new Promise(r => setTimeout(r, 8000)); 
+          op = await ai.operations.getVideosOperation({operation: op}); 
+        }
+        setVeoVideoUrl(`${op.response?.generatedVideos?.[0]?.video?.uri}&key=${process.env.API_KEY}`);
+      }
+    } catch (e) { await handleAiError(e); } finally { setIsAiLoading(false); }
+  };
+
+  const saveAsNewCharacter = () => {
+    if (!lastGeneratedUrl) return;
+    const newId = `custom_${Date.now()}`;
+    const newChar: Character = {
+      id: newId,
+      name: "AI Hero " + (characters.length - 3),
+      description: aiPrompt,
+      unlockCondition: 'ÜRETİLDİ',
+      isUnlocked: () => true,
+      baseStats: { speed: 5.5, damage: 30, hp: 130 },
+      color: '#c026d3',
+      icon: '✨',
+      specialName: 'QUANTUM BURST',
+      specialDescription: 'Zamanı yavaşlatır ve alanı temizler.'
+    };
+    setCharacters(prev => [...prev, newChar]);
+    setCustomSkins(prev => ({ ...prev, [newId]: lastGeneratedUrl }));
+    setSelectedCharId(newId);
+    alert("Karakter listene eklendi!");
+  };
+
+  const startGame = () => {
+    const char = characters.find(c => c.id === selectedCharId)!;
+    setPlayerStats({ ...INITIAL_PLAYER_STATS, ...char.baseStats, characterId: char.id, color: char.color, customSkinUrl: customSkins[char.id] });
+    setGameId(g => g + 1); setStatus(GameStatus.PLAYING); playSound('start');
+  };
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white" onContextMenu={(e) => e.preventDefault()}>
+    <div className="relative w-full h-screen bg-[#050508] text-white font-sans overflow-hidden">
       {status === GameStatus.MENU && (
-        <div className="absolute inset-0 z-20 bg-[#050510] flex flex-col items-center">
-          <div className="w-full max-w-5xl flex flex-col items-center py-6 px-6 h-full">
-            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-blue-600 mb-4 drop-shadow-2xl text-center italic tracking-tighter uppercase">NEON SURVIVOR</h1>
-            
-            <div className="flex-1 overflow-y-auto w-full mb-6 grid grid-cols-2 md:grid-cols-3 gap-4 p-4 custom-scrollbar">
-              {CHARACTERS.map(char => (
-                <button key={char.id} onClick={() => setSelectedCharId(char.id)}
-                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 group ${selectedCharId === char.id ? 'border-cyan-400 bg-cyan-950/40 scale-105 shadow-[0_0_30px_rgba(6,182,212,0.4)]' : 'border-gray-800 bg-gray-900/40 hover:border-gray-600'}`}>
-                  {customSkins[char.id] ? (
-                    <img src={customSkins[char.id]} className="w-20 h-20 object-contain rounded-full border border-white/10" alt="skin" />
-                  ) : (
-                    <div className="text-5xl group-hover:scale-125 transition-transform">{char.icon}</div>
-                  )}
-                  <div className="font-bold text-lg">{char.name}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">{char.unlockCondition}</div>
+        <div className="absolute inset-0 bg-[#050510] flex flex-col items-center py-6 px-4 overflow-y-auto">
+          <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-blue-600 mb-4 uppercase drop-shadow-2xl text-center">NEON SURVIVOR</h1>
+          
+          <div className="flex-1 w-full max-w-4xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-2 custom-scrollbar">
+            {characters.map(char => (
+              <button key={char.id} onClick={() => setSelectedCharId(char.id)}
+                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative ${selectedCharId === char.id ? 'border-cyan-400 bg-cyan-950/20 scale-105 shadow-lg' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
+                <div className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center">
+                  {customSkins[char.id] ? <img src={customSkins[char.id]} className="w-full h-full object-contain rounded-full shadow-inner" /> : <div className="text-4xl md:text-5xl">{char.icon}</div>}
+                </div>
+                <div className="font-bold text-xs text-center line-clamp-1 opacity-80">{char.name}</div>
+                {char.id.startsWith('custom_') && <div className="absolute top-1 right-1 text-[7px] font-black bg-purple-600 px-1 py-0.5 rounded uppercase">AI</div>}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row gap-3 w-full max-sm:w-full max-w-sm">
+            <button onClick={() => setStatus(GameStatus.STUDIO)} className="flex-1 py-3 bg-purple-700 hover:bg-purple-600 font-bold text-base rounded-xl border-b-4 border-purple-900 transition-all">AI STUDIO ✨</button>
+            <button onClick={startGame} className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 font-black text-xl rounded-xl border-b-4 border-cyan-800 transition-all active:translate-y-1">BAŞLAT</button>
+          </div>
+        </div>
+      )}
+
+      {status === GameStatus.STUDIO && (
+        <div className="absolute inset-0 z-50 bg-[#0a0a15] flex flex-col items-center p-4 md:p-8 backdrop-blur-3xl overflow-y-auto">
+          <div className="max-w-4xl w-full flex flex-col h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-black text-purple-400 tracking-tighter uppercase italic">AI NEON STUDIO</h2>
+              <button onClick={() => setStatus(GameStatus.MENU)} className="bg-gray-800 px-4 py-1.5 rounded-full font-bold uppercase text-[10px] hover:bg-white hover:text-black">Geri</button>
+            </div>
+
+            <div className="flex gap-1 mb-4 bg-gray-900/50 p-1 rounded-xl border border-gray-800">
+              {(['flash', 'pro', 'veo'] as const).map(tab => (
+                <button key={tab} onClick={() => { setStudioTab(tab); setVeoVideoUrl(null); }} 
+                  className={`flex-1 py-2 font-bold rounded-lg transition-all text-[10px] uppercase tracking-widest ${studioTab === tab ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                  {tab === 'flash' ? 'Hızlı Üret (Ücretsiz)' : tab === 'pro' ? 'Pro 4K (Ücretli)' : 'Video (Ücretli)'}
                 </button>
               ))}
             </div>
 
-            <div className="w-full flex flex-col sm:flex-row gap-4 justify-center items-center pb-8">
-              <button onClick={() => setIsAiModalOpen(true)} className="px-8 py-4 bg-purple-700 hover:bg-purple-600 font-bold text-lg rounded-2xl shadow-xl transition-all border-b-4 border-purple-900">
-                AI KOSTÜM ✨
-              </button>
-              <button onClick={startGame} className="px-20 py-5 bg-cyan-600 hover:bg-cyan-500 font-black text-4xl rounded-2xl shadow-[0_0_40px_rgba(6,182,212,0.4)] transition-all border-b-4 border-cyan-800">
-                BAŞLAT
-              </button>
+            <div className="flex-1 bg-black/40 border border-gray-800 rounded-2xl p-4 md:p-6 flex flex-col gap-6">
+              {studioTab !== 'flash' && (
+                <div className="bg-yellow-900/20 border border-yellow-700/30 p-2.5 rounded-lg text-[9px] text-yellow-500 font-medium">
+                  ⚠️ <b>Not:</b> Pro ve Video modelleri Google politikası gereği <b>Ücretli GCP Projesi</b> gerektirir. 
+                  <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline ml-1">Detaylar</a>
+                </div>
+              )}
+
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="w-full md:w-56 flex flex-col gap-2">
+                  <div className="aspect-square bg-gray-900 rounded-xl border border-gray-800 flex items-center justify-center overflow-hidden relative shadow-2xl">
+                    {(lastGeneratedUrl || customSkins[selectedCharId]) ? (
+                      <img src={lastGeneratedUrl || customSkins[selectedCharId]} className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <div className="text-4xl opacity-10">🎨</div>
+                    )}
+                    {isAiLoading && <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2">
+                      <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[8px] uppercase animate-pulse">Üretiliyor...</span>
+                    </div>}
+                  </div>
+                  {lastGeneratedUrl && (
+                    <button onClick={saveAsNewCharacter} className="w-full py-2 bg-cyan-700 hover:bg-cyan-600 rounded-lg font-bold uppercase text-[9px]">Koleksiyona Ekle 💾</button>
+                  )}
+                </div>
+
+                <div className="flex-1 flex flex-col gap-4">
+                  <textarea 
+                    value={aiPrompt} 
+                    onChange={e => setAiPrompt(e.target.value)} 
+                    placeholder="Karakterini tarif et... (Örn: Ateş gözlü robot kaplan)" 
+                    className="w-full h-24 bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-white outline-none focus:border-purple-500 resize-none text-xs" 
+                  />
+
+                  {studioTab === 'pro' && (
+                    <div className="flex gap-2">
+                      {(['1K', '2K', '4K'] as const).map(s => (
+                        <button key={s} onClick={() => setAiSize(s)} className={`flex-1 py-2 rounded-lg font-black border text-[10px] ${aiSize === s ? 'bg-purple-600 border-purple-400 text-white' : 'border-gray-800 text-gray-500'}`}>{s}</button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button 
+                    disabled={isAiLoading} 
+                    onClick={() => studioTab === 'flash' ? generateFlashImage() : generateProOrVeo()} 
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-black text-base shadow-xl hover:scale-[1.01] active:scale-95 disabled:opacity-50 transition-all uppercase italic">
+                    {isAiLoading ? 'YÜKLENİYOR...' : studioTab === 'flash' ? 'HIZLI ÜRET ✨' : studioTab === 'pro' ? 'PRO ÜRET (KEY) 💎' : 'VİDEO ÜRET (KEY) 🎬'}
+                  </button>
+                </div>
+              </div>
+
+              {veoVideoUrl && studioTab === 'veo' && (
+                <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border border-purple-500 shadow-2xl">
+                  <video src={veoVideoUrl} controls autoPlay loop className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {isAiModalOpen && (
-        <div className="absolute inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-6">
-          <div className="bg-gray-900 border-2 border-purple-500 p-8 rounded-[40px] max-w-md w-full shadow-[0_0_100px_rgba(168,85,247,0.3)]">
-            <h2 className="text-3xl font-black mb-2 text-purple-400 uppercase italic">KOSTÜM ÜRETİCİ</h2>
-            <p className="text-gray-500 text-sm mb-6">Karakterin için benzersiz bir top-down görünüm tasarla.</p>
-            <textarea 
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="Örn: Mavi alevli robot kedi, siber şövalye..."
-              className="w-full h-32 bg-black border border-gray-700 rounded-2xl p-4 text-white mb-6 focus:border-purple-500 outline-none resize-none"
-            />
-            <div className="flex gap-4">
-              <button onClick={() => setIsAiModalOpen(false)} className="flex-1 py-4 font-bold text-gray-400 hover:text-white">İPTAL</button>
-              <button onClick={generateAiSkin} disabled={isAiGenerating} className="flex-[2] py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-black shadow-lg disabled:opacity-50">
-                {isAiGenerating ? 'ANALİZ EDİLİYOR...' : 'KOSTÜMÜ BAS ✨'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {(status !== GameStatus.MENU) && (
+      {status === GameStatus.PLAYING && (
         <>
-          <GameCanvas 
-            key={gameId} 
-            status={status}
-            playerStats={playerStats}
-            onUpdateStats={(s) => setPlayerStats(prev => ({...prev, ...s}))}
-            onLevelUp={handleLevelUp}
-            onGameOver={() => { setStatus(GameStatus.GAME_OVER); playSound('gameover'); }}
-          />
-          <HUD stats={playerStats} isMuted={isMuted} onToggleMute={handleToggleMute} />
+          <GameCanvas key={gameId} status={status} playerStats={playerStats} onUpdateStats={s => setPlayerStats(p => ({...p, ...s}))} onLevelUp={handleLevelUp} onGameOver={() => setStatus(GameStatus.GAME_OVER)} />
+          <HUD stats={playerStats} isMuted={isMuted} onToggleMute={() => setIsMuted(toggleMute())} />
         </>
       )}
 
       {status === GameStatus.PAUSED_MANUAL && (
-        <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center">
-          <h2 className="text-8xl font-black text-cyan-400 mb-8 italic drop-shadow-[0_0_30px_rgba(34,211,238,0.5)]">DURDU</h2>
-          <button onClick={() => setStatus(GameStatus.PLAYING)} className="px-16 py-6 bg-cyan-600 hover:bg-cyan-500 font-bold text-3xl rounded-3xl shadow-2xl transition-all hover:scale-110">DEVAM ET</button>
-          <button onClick={() => setStatus(GameStatus.MENU)} className="mt-12 text-gray-500 hover:text-white uppercase tracking-widest font-bold">ANA MENÜ</button>
+        <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+          <h2 className="text-6xl font-black text-cyan-400 mb-6 italic">DURDU</h2>
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            <button onClick={() => setStatus(GameStatus.PLAYING)} className="py-4 bg-cyan-600 font-bold text-lg rounded-xl shadow-lg">DEVAM ET</button>
+            <button onClick={() => setStatus(GameStatus.MENU)} className="py-2 text-gray-400 font-bold text-xs uppercase">ANA MENÜ</button>
+          </div>
         </div>
       )}
 
-      {status === GameStatus.LEVEL_UP && <LevelUpModal options={upgradeOptions} onSelect={handleApplyUpgrade} />}
+      {status === GameStatus.LEVEL_UP && <LevelUpModal options={upgradeOptions} onSelect={opt => {
+        setPlayerStats(p => {
+          const n = {...p, level: p.level + 1, xp: 0, xpToNextLevel: Math.floor(p.xpToNextLevel * 1.5)};
+          const v = typeof opt.value === 'number' ? opt.value : 0;
+          if (opt.type === 'damage') n.damage *= (1 + v);
+          if (opt.type === 'speed') n.speed += v;
+          if (opt.type === 'fireRate') n.fireRate = Math.max(6, Math.floor(n.fireRate * (1 - v)));
+          if (opt.type === 'heal') n.hp = Math.min(n.maxHp, n.hp + v);
+          if (opt.type === 'weapon' && typeof opt.value === 'string' && !n.weapons.includes(opt.value)) n.weapons = [...n.weapons, opt.value];
+          if (opt.type === 'multishot') n.projectileCount += v;
+          return n;
+        });
+        setStatus(GameStatus.PLAYING);
+        playSound('upgrade');
+      }} />}
+      
       {status === GameStatus.GAME_OVER && <GameOverModal stats={playerStats} onRestart={startGame} />}
     </div>
   );
