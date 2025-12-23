@@ -21,9 +21,10 @@ export const INITIAL_PLAYER_STATS: PlayerStats = {
   xp: 0,
   xpToNextLevel: 50,
   killCount: 0,
+  survivalTime: 0,
   characterId: 'default',
   color: '#00f3ff',
-  weapons: ['claw'], // Varsayılan silah
+  weapons: ['claw'], 
   
   hasAura: false,
   auraRadius: 100,
@@ -43,10 +44,14 @@ export const COLORS = {
   mana: '#00ccff', 
   text: '#ffffff',
   grid: '#1a1a2e',
+  magnet: '#00aaff',
+  bomb: '#ffaa00',
+  freeze: '#00ffff'
 };
 
-export const HEALTH_DROP_CHANCE = 0.01; 
-export const HEALTH_DROP_AMOUNT = 20;
+export const HEALTH_DROP_CHANCE = 0.015; 
+export const POWERUP_DROP_CHANCE = 0.005; // Mıknatıs, Bomba, Donma gibi nadir eşyalar
+export const HEALTH_DROP_AMOUNT = 25;
 
 export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpBase: number, damage: number, speed: number, xp: number }> = {
   mouse: { color: '#a0a0a0', radius: 12, hpBase: 10, damage: 5, speed: 3.5, xp: 5 },

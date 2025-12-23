@@ -22,10 +22,12 @@ export interface PlayerStats {
   xp: number;
   xpToNextLevel: number;
   killCount: number;
+  survivalTime: number;
   
   characterId: string;
   color: string;
-  weapons: string[]; // Artık birden fazla silah destekleniyor
+  weapons: string[]; 
+  customSkinUrl?: string; // AI tarafından üretilen skin için url
   
   hasAura: boolean;
   auraRadius: number;
@@ -87,11 +89,12 @@ export interface Particle extends Position {
 }
 
 export interface Gem extends Entity {
-  type: 'xp' | 'health';
+  type: 'xp' | 'health' | 'magnet' | 'bomb' | 'freeze';
   value: number;
   color: string;
   vx: number;
   vy: number;
+  isBeingMagnetized?: boolean;
 }
 
 export interface UpgradeOption {
