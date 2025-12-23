@@ -28,7 +28,17 @@ interface Particle {
   vy: number;
   size: number;
   life: number;
+  maxLife: number;
   color: string;
+  type: 'shard' | 'plus' | 'spark' | 'ember';
+}
+
+interface TerrainObject {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  type: 'tree' | 'rock' | 'cactus' | 'lava_vent';
 }
 
 const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateStats, onLevelUp, onGameOver }) => {
@@ -68,6 +78,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     gems: [] as Gem[],
     effects: [] as Effect[],
     particles: [] as Particle[],
+    terrain: [] as TerrainObject[],
     weaponLastShotTimes: {} as Record<string, number>,
     spawnTimer: 0,
     frameCount: 0,
@@ -79,8 +90,28 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
   const statsRef = useRef(playerStats);
   useEffect(() => { 
     statsRef.current = playerStats;
-    if (status === GameStatus.PLAYING) gameState.current.isLevelingUp = false;
+    if (status === GameStatus.PLAYING) {
+      gameState.current.isLevelingUp = false;
+      // Initialize terrain objects once
+      generateTerrain(playerStats.selectedMap);
+    }
   }, [playerStats, status]);
+
+  const generateTerrain = (mapType: MapType) => {
+    const state = gameState.current;
+    if (state.terrain.length > 0) return;
+    const count = 150;
+    const cfg = MAP_CONFIGS[mapType];
+    for (let i = 0; i < count; i++) {
+      state.terrain.push({
+        x: Math.random() * MAP_WIDTH,
+        y: Math.random() * MAP_HEIGHT,
+        size: 20 + Math.random() * 40,
+        color: cfg.accentColor,
+        type: mapType === 'forest' ? 'tree' : mapType === 'desert' ? 'cactus' : 'lava_vent'
+      });
+    }
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -123,6 +154,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     };
   }, [status]);
 
+  const createCollectionBurst = (x: number, y: number, color: string, type: GemType) => {
+    const state = gameState.current;
+    let count = 8;
+    let pType: Particle['type'] = 'shard';
+    
+    if (type === 'health') { count = 5; pType = 'plus'; }
+    if (type === 'magnet') { count = 12; pType = 'spark'; }
+    if (type === 'bomb') { count = 20; pType = 'ember'; }
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const force = Math.random() * 5 + 2;
+      state.particles.push({
+        x, y,
+        vx: Math.cos(angle) * force,
+        vy: Math.sin(angle) * force + (type === 'health' ? -2 : 0),
+        size: Math.random() * 4 + 2,
+        life: 40,
+        maxLife: 40,
+        color,
+        type: pType
+      });
+    }
+  };
+
   const useSpecial = () => {
     const state = gameState.current;
     if (statsRef.current.mana < statsRef.current.maxMana) return;
@@ -141,6 +197,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
 
   const spawnEnemy = (sw: number, sh: number) => {
     const state = gameState.current;
+    const stats = statsRef.current;
+    const mapCfg = MAP_CONFIGS[stats.selectedMap];
     const difficulty = 1 + (state.gameTime / 180);
     const side = Math.floor(Math.random() * 4);
     let x, y;
@@ -151,14 +209,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     else if (side === 2) { x = state.camera.x + Math.random() * sw; y = state.camera.y + sh + margin; }
     else { x = state.camera.x - margin; y = state.camera.y + Math.random() * sh; }
 
-    const types: EnemyType[] = ['skeleton', 'bat', 'orc', 'vampire', 'snake', 'dragon'];
-    
-    let maxIdx = 2;
-    if (state.gameTime > 60) maxIdx = 3;
-    if (state.gameTime > 120) maxIdx = 5;
-    if (state.gameTime > 300) maxIdx = 6;
-    
-    const type = types[Math.floor(Math.random() * maxIdx)];
+    // Map Specific enemy selection
+    const pool = mapCfg.enemyPool;
+    const type = pool[Math.floor(Math.random() * pool.length)];
     const base = ENEMY_TYPES[type];
 
     state.enemies.push({
@@ -184,23 +237,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       onUpdateStats({ survivalTime: state.gameTime, mana: Math.min(stats.maxMana, stats.mana + 1) });
     }
 
-    // Environmental Particles
-    if (state.frameCount % 5 === 0) {
-      const mapCfg = MAP_CONFIGS[stats.selectedMap];
-      state.particles.push({
-        x: state.camera.x + Math.random() * sw,
-        y: state.camera.y + Math.random() * sh,
-        vx: (Math.random() - 0.5) * 1,
-        vy: (Math.random() - 0.5) * 1 - 0.5,
-        size: Math.random() * 3 + 1,
-        life: 100,
-        color: mapCfg.accentColor
-      });
-    }
-
+    // Particle logic
     for (let i = state.particles.length - 1; i >= 0; i--) {
       const p = state.particles[i];
       p.x += p.vx; p.y += p.vy; p.life--;
+      if (p.type === 'plus') p.vy -= 0.05; 
+      if (p.type === 'ember') { p.vx *= 0.98; p.vy *= 0.98; } 
       if (p.life <= 0) state.particles.splice(i, 1);
     }
 
@@ -226,6 +268,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       state.playerVel.y *= 0.8;
     }
 
+    // Wrap around or clamp? Let's use survivors infinite logic (wrap pos loosely)
     state.camera.x = state.playerPos.x - sw / 2;
     state.camera.y = state.playerPos.y - sh / 2;
 
@@ -300,8 +343,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       let speed = e.speed;
       let finalAngle = angle;
       if (e.type === 'snake') {
-        const sinOffset = Math.sin(state.frameCount * 0.1) * 0.8;
-        finalAngle += sinOffset;
+        finalAngle += Math.sin(state.frameCount * 0.1) * 0.8;
       }
       
       e.x += Math.cos(finalAngle) * speed;
@@ -327,6 +369,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       }
 
       if (d < 50) {
+        createCollectionBurst(g.x, g.y, g.color, g.type);
         if (g.type === 'health') {
           onUpdateStats({ hp: Math.min(stats.maxHp, stats.hp + 35) });
           state.effects.push({ x: g.x, y: g.y, radius: 100, life: 15, maxLife: 15, color: 'rgba(255, 0, 51, 0.4)' });
@@ -370,23 +413,71 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       state.screenShake *= 0.85;
     }
 
-    // Dynamic Map Background
+    // Ground Rendering
     ctx.fillStyle = mapCfg.bgColor; ctx.fillRect(0, 0, sw, sh);
     
-    // Dynamic Grid
-    ctx.strokeStyle = mapCfg.gridColor; ctx.lineWidth = 1; ctx.beginPath();
-    const gridSize = 200;
-    for (let x = -cam.x % gridSize; x < sw; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, sh); }
-    for (let y = -cam.y % gridSize; y < sh; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(sw, y); }
+    // Draw Environment Pattern (Ground Texture)
+    ctx.strokeStyle = mapCfg.gridColor; ctx.lineWidth = 1; 
+    const step = 150;
+    ctx.beginPath();
+    for (let x = -cam.x % step; x < sw; x += step) {
+      for (let y = -cam.y % step; y < sh; y += step) {
+        if (stats.selectedMap === 'forest') {
+          // Vine patterns
+          ctx.moveTo(x, y); ctx.lineTo(x + 20, y + 20);
+        } else if (stats.selectedMap === 'desert') {
+          // Wind ripples
+          ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 75, y + 20, x + 150, y);
+        } else {
+          // Lava cracks
+          ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(state.frameCount * 0.01) * 30, y + 100);
+        }
+      }
+    }
     ctx.stroke();
 
-    // Draw Particles
-    state.particles.forEach(p => {
-      ctx.globalAlpha = p.life / 100;
-      ctx.fillStyle = p.color;
-      ctx.beginPath(); ctx.arc(p.x - cam.x, p.y - cam.y, p.size, 0, Math.PI*2); ctx.fill();
+    // Terrain objects
+    state.terrain.forEach(obj => {
+      const ox = obj.x - cam.x, oy = obj.y - cam.y;
+      if (ox < -100 || ox > sw + 100 || oy < -100 || oy > sh + 100) return;
+      ctx.save();
+      ctx.translate(ox, oy);
+      ctx.shadowBlur = 10; ctx.shadowColor = obj.color;
+      ctx.fillStyle = obj.color + '44'; // Semi transparent
+      if (obj.type === 'tree') {
+        ctx.beginPath(); ctx.arc(0, 0, obj.size, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = obj.color; ctx.lineWidth = 2; ctx.stroke();
+      } else if (obj.type === 'cactus') {
+        ctx.fillRect(-10, -obj.size, 20, obj.size);
+        ctx.fillRect(-25, -obj.size * 0.6, 15, 10);
+        ctx.fillRect(10, -obj.size * 0.8, 15, 10);
+      } else {
+        // Lava vent
+        const pulsate = Math.sin(state.frameCount * 0.05) * 10;
+        ctx.fillStyle = '#ff4400';
+        ctx.beginPath(); ctx.ellipse(0, 0, obj.size + pulsate, obj.size * 0.3, 0, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
     });
-    ctx.globalAlpha = 1;
+
+    // Particles
+    state.particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x - cam.x, p.y - cam.y);
+      if (p.type === 'shard') {
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+      } else if (p.type === 'plus') {
+        ctx.fillRect(-p.size/2, -p.size*1.5, p.size, p.size*3);
+        ctx.fillRect(-p.size*1.5, -p.size/2, p.size*3, p.size);
+      } else if (p.type === 'spark') {
+        ctx.beginPath(); ctx.arc(0, 0, p.size, 0, Math.PI*2); ctx.fill();
+      } else if (p.type === 'ember') {
+        ctx.beginPath(); ctx.arc(0, 0, p.size*1.5, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    });
 
     state.effects.forEach(fx => {
       ctx.save();
@@ -400,19 +491,35 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
     });
 
     state.gems.forEach(g => {
-      ctx.shadowBlur = 15; ctx.shadowColor = g.color; ctx.fillStyle = g.color;
-      ctx.beginPath(); 
+      ctx.save();
+      const pulse = Math.sin(state.frameCount * 0.1) * 2;
+      ctx.shadowBlur = 15; ctx.shadowColor = g.color;
+      ctx.fillStyle = g.color;
+      ctx.translate(g.x - cam.x, g.y - cam.y);
       if (g.type === 'bomb') {
-        for (let i = 0; i < 5; i++) {
-          ctx.lineTo(g.x - cam.x + g.radius * Math.cos((18 + i * 72) * Math.PI / 180), g.y - cam.y - g.radius * Math.sin((18 + i * 72) * Math.PI / 180));
-          ctx.lineTo(g.x - cam.x + (g.radius / 2) * Math.cos((54 + i * 72) * Math.PI / 180), g.y - cam.y - (g.radius / 2) * Math.sin((54 + i * 72) * Math.PI / 180));
+        const spikeCount = 8;
+        ctx.beginPath();
+        for (let i = 0; i < spikeCount * 2; i++) {
+          const radius = i % 2 === 0 ? g.radius + pulse : (g.radius * 0.5) + pulse;
+          const angle = (i / spikeCount) * Math.PI;
+          ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
         }
+        ctx.closePath(); ctx.fill();
+      } else if (g.type === 'health') {
+        const size = g.radius + pulse;
+        ctx.fillRect(-size/4, -size, size/2, size*2);
+        ctx.fillRect(-size, -size/4, size*2, size/2);
       } else if (g.type === 'magnet') {
-        ctx.rect(g.x - cam.x - g.radius, g.y - cam.y - g.radius, g.radius * 2, g.radius * 2);
+        ctx.lineWidth = 3; ctx.strokeStyle = g.color;
+        ctx.beginPath(); ctx.arc(0, 0, g.radius + pulse, Math.PI, 0); ctx.stroke();
       } else {
-        ctx.arc(g.x - cam.x, g.y - cam.y, g.radius, 0, Math.PI*2); 
+        ctx.rotate(state.frameCount * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(0, -(g.radius + pulse)); ctx.lineTo(g.radius + pulse, 0);
+        ctx.lineTo(0, g.radius + pulse); ctx.lineTo(-(g.radius + pulse), 0);
+        ctx.closePath(); ctx.fill();
       }
-      ctx.fill();
+      ctx.restore();
     });
 
     state.bullets.forEach(b => {
@@ -424,18 +531,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       if (b.style === 'claw') {
         ctx.beginPath();
         for(let off of [-8, 0, 8]) { ctx.moveTo(-15, off); ctx.quadraticCurveTo(8, off + Math.sin(state.frameCount*0.3)*6, 15, off); }
-        ctx.lineWidth = 4; ctx.strokeStyle = b.color; ctx.lineCap = 'round'; ctx.stroke();
+        ctx.lineWidth = 4; ctx.strokeStyle = b.color; ctx.stroke();
       } else if (b.style === 'axe') {
         ctx.beginPath(); ctx.moveTo(-22,-22); ctx.lineTo(22,0); ctx.lineTo(-22,22); ctx.closePath(); ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       } else if (b.style === 'beam') {
         const p = Math.sin(state.frameCount * 0.4) * 6 + 12;
         ctx.fillRect(-100, -p/2, 200, p);
-        ctx.fillStyle = '#fff'; ctx.fillRect(-100, -p/4, 200, p/2);
       } else if (b.style === 'orb') {
-        const p = Math.sin(state.frameCount * 0.2) * 5;
-        ctx.beginPath(); ctx.arc(0, 0, b.radius + p, 0, Math.PI*2); ctx.fill();
-        ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(0, 0, b.radius*2.2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, b.radius + Math.sin(state.frameCount * 0.2) * 5, 0, Math.PI*2); ctx.fill();
       } else {
         ctx.beginPath(); ctx.arc(0, 0, b.radius, 0, Math.PI*2); ctx.fill();
       }
@@ -449,85 +552,61 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ status, playerStats, onUpdateSt
       ctx.translate(ex, ey);
       ctx.shadowBlur = 15; ctx.shadowColor = e.color;
       ctx.fillStyle = e.hitFlash ? '#fff' : e.color;
-      
       const anim = Math.sin(state.frameCount * 0.1) * 2;
       
       if (e.type === 'skeleton') {
         ctx.beginPath(); ctx.arc(0, -e.radius/2 + anim, e.radius/1.4, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-e.radius/3, -e.radius/2 + anim, 3, 0, Math.PI*2); ctx.arc(e.radius/3, -e.radius/2 + anim, 3, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = e.hitFlash ? '#fff' : e.color;
         for(let i=0; i<3; i++) ctx.fillRect(-e.radius/1.5, i*7 + anim, e.radius*1.3, 3);
       } else if (e.type === 'orc') {
         ctx.beginPath(); ctx.arc(0, anim, e.radius, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = '#1f2937'; ctx.fillRect(-e.radius, -e.radius/3 + anim, e.radius*2, 12);
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-e.radius/2, 8+anim); ctx.lineTo(-e.radius/1.5, 18+anim); ctx.lineTo(-e.radius/4, 12+anim); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(e.radius/2, 8+anim); ctx.lineTo(e.radius/1.5, 18+anim); ctx.lineTo(e.radius/4, 12+anim); ctx.fill();
       } else if (e.type === 'vampire') {
         ctx.beginPath(); ctx.moveTo(-e.radius*1.2, -e.radius+anim); ctx.lineTo(0, e.radius*1.5+anim); ctx.lineTo(e.radius*1.2, -e.radius+anim); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#f3f4f6'; ctx.beginPath(); ctx.arc(0, -e.radius/1.5+anim, e.radius/1.8, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(-e.radius/5, -e.radius/1.5+anim, 2.5, 0, Math.PI*2); ctx.arc(e.radius/5, -e.radius/1.5+anim, 2.5, 0, Math.PI*2); ctx.fill();
       } else if (e.type === 'snake') {
-        const angle = Math.atan2(state.playerPos.y - e.y, state.playerPos.x - e.x);
+        const ang = Math.atan2(state.playerPos.y - e.y, state.playerPos.x - e.x);
         for (let i = 0; i < 5; i++) {
-          const offset = i * 14;
           const sinBody = Math.sin((state.frameCount - i * 5) * 0.15) * 12;
-          const bx = -Math.cos(angle) * offset + Math.cos(angle + Math.PI/2) * sinBody;
-          const by = -Math.sin(angle) * offset + Math.sin(angle + Math.PI/2) * sinBody;
-          ctx.beginPath(); ctx.arc(bx, by, e.radius - i * 1.5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(-Math.cos(ang)*i*14 + Math.cos(ang+Math.PI/2)*sinBody, -Math.sin(ang)*i*14 + Math.sin(ang+Math.PI/2)*sinBody, e.radius-i*1.5, 0, Math.PI*2); ctx.fill();
         }
       } else if (e.type === 'dragon') {
-        const wingFlap = Math.sin(state.frameCount * 0.08) * 40;
-        ctx.save();
-        ctx.rotate(Math.atan2(state.playerPos.y - e.y, state.playerPos.x - e.x));
-        ctx.fillStyle = e.color + '44'; 
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-40, -60 - wingFlap); ctx.lineTo(40, -40); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-40, 60 + wingFlap); ctx.lineTo(40, 40); ctx.closePath(); ctx.fill();
+        const flap = Math.sin(state.frameCount * 0.08) * 40;
+        ctx.save(); ctx.rotate(Math.atan2(state.playerPos.y-e.y, state.playerPos.x-e.x));
+        ctx.fillStyle = e.color+'44';
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-40, -60-flap); ctx.lineTo(40,-40); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-40, 60+flap); ctx.lineTo(40,40); ctx.closePath(); ctx.fill();
         ctx.fillStyle = e.hitFlash ? '#fff' : e.color;
-        ctx.beginPath(); ctx.ellipse(0, 0, e.radius, e.radius * 0.6, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(e.radius * 0.8, 0, e.radius * 0.4, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(e.radius * 1.0, -8, 4, 0, Math.PI*2); ctx.arc(e.radius * 1.0, 8, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0,0, e.radius, e.radius*0.6, 0, 0, Math.PI*2); ctx.fill();
         ctx.restore();
+      } else if (e.type === 'scorpion') {
+        ctx.beginPath(); ctx.ellipse(0, anim, e.radius*1.4, e.radius, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-e.radius, anim); ctx.quadraticCurveTo(-e.radius*2, -e.radius*2, 0, -e.radius*2); ctx.lineWidth=4; ctx.strokeStyle=e.color; ctx.stroke();
+      } else if (e.type === 'imp') {
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath(); ctx.arc(0, anim, e.radius + Math.sin(state.frameCount*0.2)*4, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
       } else {
         const flap = Math.sin(state.frameCount * 0.4) * e.radius;
-        ctx.beginPath(); ctx.moveTo(-e.radius - flap, -flap + anim); ctx.lineTo(0, anim); ctx.lineTo(e.radius + flap, -flap + anim); ctx.lineWidth = 4; ctx.strokeStyle = e.color; ctx.stroke();
         ctx.beginPath(); ctx.arc(0, anim, e.radius/1.2, 0, Math.PI*2); ctx.fill();
       }
       ctx.restore();
     });
 
     const px = state.playerPos.x - cam.x, py = state.playerPos.y - cam.y;
-    
     const floatAnim = Math.sin(state.frameCount * 0.15) * 4;
-    ctx.save();
-    ctx.translate(px, py + 35);
-    ctx.scale(1, 0.4);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.beginPath();
-    ctx.arc(0, 0, 25 - floatAnim/2, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
+    ctx.save(); ctx.translate(px, py + 35); ctx.scale(1, 0.4); ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.arc(0, 0, 25 - floatAnim/2, 0, Math.PI*2); ctx.fill(); ctx.restore();
 
-    ctx.save();
-    ctx.translate(px, py + floatAnim);
-    
-    const tiltX = state.playerVel.x * 0.05;
-    ctx.rotate(tiltX);
+    ctx.save(); ctx.translate(px, py + floatAnim);
     if (state.playerFacingLeft) ctx.scale(-1, 1);
-
     ctx.shadowBlur = 45; ctx.shadowColor = stats.color;
     if (skinImageRef.current) {
       ctx.drawImage(skinImageRef.current, -60, -60, 120, 120);
     } else {
       ctx.fillStyle = stats.color; 
       ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-22,-10); ctx.lineTo(-32,-40); ctx.lineTo(-6,-22); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(22,-10); ctx.lineTo(32,-40); ctx.lineTo(6,-22); ctx.fill();
-      ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-10, -8, 6, 0, Math.PI*2); ctx.arc(10, -8, 6, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-8, -10, 2.5, 0, Math.PI*2); ctx.arc(12, -10, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(-10,-8,6,0,Math.PI*2); ctx.arc(10,-8,6,0,Math.PI*2); ctx.fill();
     }
-    ctx.restore();
-    ctx.restore();
+    ctx.restore(); ctx.restore();
   };
 
   return <canvas ref={canvasRef} className="block w-full h-full" onContextMenu={(e) => e.preventDefault()} />;

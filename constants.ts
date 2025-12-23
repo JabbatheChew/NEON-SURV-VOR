@@ -8,29 +8,32 @@ export const MAP_CONFIGS: Record<MapType, MapConfig> = {
   forest: {
     id: 'forest',
     name: 'Cyber Forest',
-    bgColor: '#050a05',
-    gridColor: '#0a1a0a',
-    accentColor: '#00ff66',
+    bgColor: '#0a1a0a',
+    gridColor: '#1a2a1a',
+    accentColor: '#4ade80',
     description: 'Neon yapraklar ve pürüzsüz enerji.',
-    icon: '🌳'
+    icon: '🌳',
+    enemyPool: ['bat', 'snake', 'orc', 'dragon']
   },
   desert: {
     id: 'desert',
     name: 'Neon Desert',
-    bgColor: '#0a0805',
-    gridColor: '#1a140a',
-    accentColor: '#ffaa00',
+    bgColor: '#1c1917',
+    gridColor: '#292524',
+    accentColor: '#fbbf24',
     description: 'Sonsuz kumlar ve kavurucu sıcak.',
-    icon: '🏜️'
+    icon: '🏜️',
+    enemyPool: ['skeleton', 'scorpion', 'snake', 'dragon']
   },
   lava: {
     id: 'lava',
     name: 'Techno Lava',
-    bgColor: '#0a0505',
-    gridColor: '#1a0a0a',
-    accentColor: '#ff3300',
+    bgColor: '#1c0a0a',
+    gridColor: '#2d0a0a',
+    accentColor: '#f87171',
     description: 'Erimiş devreler ve volkanik küller.',
-    icon: '🌋'
+    icon: '🌋',
+    enemyPool: ['vampire', 'imp', 'orc', 'dragon']
   }
 };
 
@@ -87,7 +90,9 @@ export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpB
   vampire: { color: '#b91c1c', radius: 19, hpBase: 35, damage: 12, speed: 3.5, xp: 30 }, 
   bat: { color: '#6d28d9', radius: 11, hpBase: 8, damage: 4, speed: 4.8, xp: 8 },
   snake: { color: '#22c55e', radius: 14, hpBase: 40, damage: 10, speed: 3.0, xp: 25 },
-  dragon: { color: '#f59e0b', radius: 45, hpBase: 500, damage: 25, speed: 1.8, xp: 250 }
+  dragon: { color: '#f59e0b', radius: 45, hpBase: 500, damage: 25, speed: 1.8, xp: 250 },
+  scorpion: { color: '#fcd34d', radius: 15, hpBase: 25, damage: 8, speed: 4.2, xp: 18 },
+  imp: { color: '#ef4444', radius: 12, hpBase: 12, damage: 6, speed: 5.0, xp: 10 }
 };
 
 export const CHARACTERS: Character[] = [

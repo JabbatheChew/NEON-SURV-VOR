@@ -18,6 +18,7 @@ export interface MapConfig {
   accentColor: string;
   description: string;
   icon: string;
+  enemyPool: EnemyType[];
 }
 
 export interface PlayerStats {
@@ -63,7 +64,7 @@ export interface Entity extends Position {
   radius: number;
 }
 
-export type EnemyType = 'skeleton' | 'orc' | 'vampire' | 'bat' | 'snake' | 'dragon';
+export type EnemyType = 'skeleton' | 'orc' | 'vampire' | 'bat' | 'snake' | 'dragon' | 'scorpion' | 'imp';
 
 export interface Enemy extends Entity {
   type: EnemyType;
