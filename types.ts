@@ -2,8 +2,8 @@
 export enum GameStatus {
   MENU = 'MENU',
   PLAYING = 'PLAYING',
-  LEVEL_UP = 'LEVEL_UP', // Old PAUSED
-  PAUSED_MANUAL = 'PAUSED_MANUAL', // New ESC Pause
+  LEVEL_UP = 'LEVEL_UP',
+  PAUSED_MANUAL = 'PAUSED_MANUAL',
   GAME_OVER = 'GAME_OVER'
 }
 
@@ -14,21 +14,19 @@ export interface PlayerStats {
   maxMana: number;    
   speed: number;
   damage: number;
-  fireRate: number; // Frames between shots
+  fireRate: number; 
   bulletSpeed: number;
   penetration: number;
-  projectileCount: number; // Number of bullets per shot
+  projectileCount: number; 
   level: number;
   xp: number;
   xpToNextLevel: number;
   killCount: number;
   
-  // Character specific visuals/mechanics
   characterId: string;
   color: string;
-  weaponType: 'claw' | 'orb' | 'beam' | 'axe' | 'boomerang' | 'spiral'; // Added types
+  weapons: string[]; // Artık birden fazla silah destekleniyor
   
-  // Passives
   hasAura: boolean;
   auraRadius: number;
   auraDamage: number;
@@ -59,7 +57,7 @@ export interface Enemy extends Entity {
   color: string;
   damage: number;
   xpValue: number;
-  wobbleOffset?: number; // For bat movement
+  wobbleOffset?: number;
 }
 
 export interface Bullet extends Entity {
@@ -67,20 +65,29 @@ export interface Bullet extends Entity {
   vy: number;
   damage: number;
   penetration: number;
-  life: number; // Frames to live
+  life: number;
   color: string;
-  angle: number; // For drawing rotation
-  style: 'claw' | 'orb' | 'beam' | 'axe' | 'boomerang' | 'spiral';
-  gravity?: number; // For axe physics
-  
-  // New physics props
+  angle: number;
+  style: string;
   initialVx?: number; 
   initialVy?: number;
-  spawnFrame?: number; // For time-based pathing (spiral)
+  spawnFrame?: number;
+  prevX?: number;
+  prevY?: number;
+}
+
+export interface Particle extends Position {
+  id: string;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  radius: number;
 }
 
 export interface Gem extends Entity {
-  type: 'xp' | 'health'; // Distinguish between XP and HP drops
+  type: 'xp' | 'health';
   value: number;
   color: string;
   vx: number;
@@ -92,19 +99,15 @@ export interface UpgradeOption {
   title: string;
   description: string;
   type: 'damage' | 'speed' | 'fireRate' | 'bulletSpeed' | 'penetration' | 'heal' | 'multishot' | 'weapon' | 'aura' | 'orbital';
-  value: number | string; // value can be string for weapon type change
+  value: number | string;
   icon: string;
   rarity: 'common' | 'rare' | 'legendary';
-}
-
-export interface GameSettings {
-  audioEnabled: boolean;
 }
 
 export interface PersistentData {
   totalKills: number;
   maxLevel: number;
-  longestRun: number; // seconds
+  longestRun: number;
 }
 
 export interface Character {
