@@ -16,6 +16,7 @@ export interface MapConfig {
   bgColor: string;
   gridColor: string;
   accentColor: string;
+  floorPattern: string;
   description: string;
   icon: string;
   enemyPool: EnemyType[];
@@ -54,6 +55,17 @@ export interface PlayerStats {
   orbitalDamage: number;
 }
 
+export interface FloatingText {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  life: number;
+  vx: number;
+  vy: number;
+}
+
 export interface Position {
   x: number;
   y: number;
@@ -75,6 +87,8 @@ export interface Enemy extends Entity {
   damage: number;
   xpValue: number;
   hitFlash?: number;
+  knockbackX?: number;
+  knockbackY?: number;
 }
 
 export interface Bullet extends Entity {
@@ -87,8 +101,6 @@ export interface Bullet extends Entity {
   angle: number;
   style: string;
   spawnFrame?: number;
-  prevX?: number;
-  prevY?: number;
 }
 
 export type GemType = 'xp' | 'health' | 'magnet' | 'bomb';

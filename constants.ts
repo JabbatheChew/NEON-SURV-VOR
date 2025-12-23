@@ -8,9 +8,10 @@ export const MAP_CONFIGS: Record<MapType, MapConfig> = {
   forest: {
     id: 'forest',
     name: 'Cyber Forest',
-    bgColor: '#0a1a0a',
-    gridColor: '#1a2a1a',
+    bgColor: '#041504',
+    gridColor: '#0a250a',
     accentColor: '#4ade80',
+    floorPattern: 'grass',
     description: 'Neon yapraklar ve pürüzsüz enerji.',
     icon: '🌳',
     enemyPool: ['bat', 'snake', 'orc', 'dragon']
@@ -18,9 +19,10 @@ export const MAP_CONFIGS: Record<MapType, MapConfig> = {
   desert: {
     id: 'desert',
     name: 'Neon Desert',
-    bgColor: '#1c1917',
-    gridColor: '#292524',
+    bgColor: '#1a140a',
+    gridColor: '#2b2010',
     accentColor: '#fbbf24',
+    floorPattern: 'sand',
     description: 'Sonsuz kumlar ve kavurucu sıcak.',
     icon: '🏜️',
     enemyPool: ['skeleton', 'scorpion', 'snake', 'dragon']
@@ -28,9 +30,10 @@ export const MAP_CONFIGS: Record<MapType, MapConfig> = {
   lava: {
     id: 'lava',
     name: 'Techno Lava',
-    bgColor: '#1c0a0a',
-    gridColor: '#2d0a0a',
+    bgColor: '#150505',
+    gridColor: '#2a0808',
     accentColor: '#f87171',
+    floorPattern: 'obsidian',
     description: 'Erimiş devreler ve volkanik küller.',
     icon: '🌋',
     enemyPool: ['vampire', 'imp', 'orc', 'dragon']
@@ -79,20 +82,20 @@ export const COLORS = {
 };
 
 export const PICKUP_CHANCES = {
-  bomb: 0.008,   // En nadir
+  bomb: 0.008,
   magnet: 0.012, 
-  health: 0.025  // En yaygın
+  health: 0.025
 };
 
 export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpBase: number, damage: number, speed: number, xp: number }> = {
-  skeleton: { color: '#f8fafc', radius: 16, hpBase: 15, damage: 5, speed: 2.2, xp: 12 }, 
-  orc: { color: '#166534', radius: 26, hpBase: 80, damage: 15, speed: 1.4, xp: 45 },    
-  vampire: { color: '#b91c1c', radius: 19, hpBase: 35, damage: 12, speed: 3.5, xp: 30 }, 
-  bat: { color: '#6d28d9', radius: 11, hpBase: 8, damage: 4, speed: 4.8, xp: 8 },
-  snake: { color: '#22c55e', radius: 14, hpBase: 40, damage: 10, speed: 3.0, xp: 25 },
-  dragon: { color: '#f59e0b', radius: 45, hpBase: 500, damage: 25, speed: 1.8, xp: 250 },
-  scorpion: { color: '#fcd34d', radius: 15, hpBase: 25, damage: 8, speed: 4.2, xp: 18 },
-  imp: { color: '#ef4444', radius: 12, hpBase: 12, damage: 6, speed: 5.0, xp: 10 }
+  skeleton: { color: '#f8fafc', radius: 16, hpBase: 25, damage: 5, speed: 2.2, xp: 12 }, 
+  orc: { color: '#166534', radius: 26, hpBase: 120, damage: 15, speed: 1.4, xp: 45 },    
+  vampire: { color: '#b91c1c', radius: 19, hpBase: 55, damage: 12, speed: 3.5, xp: 30 }, 
+  bat: { color: '#6d28d9', radius: 11, hpBase: 12, damage: 4, speed: 4.8, xp: 8 },
+  snake: { color: '#22c55e', radius: 14, hpBase: 45, damage: 10, speed: 3.0, xp: 25 },
+  dragon: { color: '#f59e0b', radius: 45, hpBase: 800, damage: 25, speed: 1.8, xp: 250 },
+  scorpion: { color: '#fcd34d', radius: 15, hpBase: 35, damage: 8, speed: 4.2, xp: 18 },
+  imp: { color: '#ef4444', radius: 12, hpBase: 18, damage: 6, speed: 5.0, xp: 10 }
 };
 
 export const CHARACTERS: Character[] = [

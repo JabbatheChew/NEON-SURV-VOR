@@ -159,16 +159,17 @@ const App: React.FC = () => {
 
   const selectedChar = characters.find(c => c.id === selectedCharId);
 
+  // Helper check for active game session
+  const isGameActive = status === GameStatus.PLAYING || status === GameStatus.LEVEL_UP || status === GameStatus.PAUSED_MANUAL;
+
   return (
     <div className="relative w-full h-screen bg-[#050508] text-white font-sans overflow-hidden">
       {status === GameStatus.MENU && (
-        <div className="absolute inset-0 bg-[#050510] flex flex-col items-center py-6 px-4 overflow-y-auto">
+        <div className="absolute inset-0 bg-[#050510] flex flex-col items-center py-6 px-4 overflow-y-auto z-50">
           <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-blue-600 mb-8 uppercase drop-shadow-2xl text-center">NEON SURVIVOR</h1>
           
           <div className="flex-1 w-full max-w-5xl flex flex-col md:flex-row gap-8 items-center justify-center">
-            {/* Character & Map Selection Container */}
             <div className="flex flex-col gap-6 w-full md:w-2/3">
-              {/* Karakter Seçimi */}
               <div className="bg-gray-900/30 p-4 rounded-3xl border border-gray-800">
                 <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Karakter Seç</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 custom-scrollbar">
@@ -185,7 +186,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Harita Seçimi */}
               <div className="bg-gray-900/30 p-4 rounded-3xl border border-gray-800">
                 <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Bölge Seç</h3>
                 <div className="grid grid-cols-3 gap-3">
@@ -201,7 +201,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* 3D Character Preview Panel */}
             <div className="w-full md:w-1/3 perspective-container hidden md:block">
               <div className="char-3d-card bg-cyan-950/10 border border-cyan-400/30 rounded-3xl p-8 flex flex-col items-center justify-center relative shadow-[0_0_50px_rgba(0,243,255,0.1)] h-[400px]">
                 <div className="absolute inset-0 hologram-grid opacity-20 rounded-3xl"></div>
@@ -216,7 +215,6 @@ const App: React.FC = () => {
                      <p className="text-xs text-gray-400 mt-2 uppercase tracking-widest">{selectedChar?.specialName}</p>
                    </div>
                 </div>
-                {/* 3D Floor Effect */}
                 <div className="absolute bottom-10 w-32 h-8 bg-cyan-400/20 blur-xl rounded-full"></div>
               </div>
             </div>
@@ -230,7 +228,7 @@ const App: React.FC = () => {
       )}
 
       {status === GameStatus.STUDIO && (
-        <div className="absolute inset-0 z-50 bg-[#0a0a15] flex flex-col items-center p-4 md:p-8 backdrop-blur-3xl overflow-y-auto">
+        <div className="absolute inset-0 z-[60] bg-[#0a0a15] flex flex-col items-center p-4 md:p-8 backdrop-blur-3xl overflow-y-auto">
           <div className="max-w-4xl w-full flex flex-col h-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-black text-purple-400 tracking-tighter uppercase italic">AI NEON STUDIO</h2>
@@ -307,38 +305,48 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {status === GameStatus.PLAYING && (
+      {/* CORE GAME COMPONENTS - Persist during PAUSE and LEVEL UP */}
+      {isGameActive && (
         <>
-          <GameCanvas key={gameId} status={status} playerStats={playerStats} onUpdateStats={s => setPlayerStats(p => ({...p, ...s}))} onLevelUp={handleLevelUp} onGameOver={() => setStatus(GameStatus.GAME_OVER)} />
+          <GameCanvas 
+            key={gameId} 
+            status={status} 
+            playerStats={playerStats} 
+            onUpdateStats={s => setPlayerStats(p => ({...p, ...s}))} 
+            onLevelUp={handleLevelUp} 
+            onGameOver={() => setStatus(GameStatus.GAME_OVER)} 
+          />
           <HUD stats={playerStats} isMuted={isMuted} onToggleMute={() => setIsMuted(toggleMute())} />
         </>
       )}
 
       {status === GameStatus.PAUSED_MANUAL && (
-        <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-          <h2 className="text-6xl font-black text-cyan-400 mb-6 italic">DURDU</h2>
+        <div className="absolute inset-0 z-[200] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+          <h2 className="text-6xl font-black text-cyan-400 mb-6 italic tracking-tighter">DURAKLATILDI</h2>
           <div className="flex flex-col gap-3 w-full max-w-xs">
-            <button onClick={() => setStatus(GameStatus.PLAYING)} className="py-4 bg-cyan-600 font-bold text-lg rounded-xl shadow-lg">DEVAM ET</button>
-            <button onClick={() => setStatus(GameStatus.MENU)} className="py-2 text-gray-400 font-bold text-xs uppercase">ANA MENÜ</button>
+            <button onClick={() => setStatus(GameStatus.PLAYING)} className="py-4 bg-cyan-600 hover:bg-cyan-500 font-bold text-lg rounded-xl shadow-lg transition-transform active:scale-95 uppercase">DEVAM ET</button>
+            <button onClick={() => setStatus(GameStatus.MENU)} className="py-2 text-gray-400 font-bold text-xs uppercase hover:text-white transition-colors">ANA MENÜYE DÖN</button>
           </div>
         </div>
       )}
 
-      {status === GameStatus.LEVEL_UP && <LevelUpModal options={upgradeOptions} onSelect={opt => {
-        setPlayerStats(p => {
-          const n = {...p, level: p.level + 1, xp: 0, xpToNextLevel: Math.floor(p.xpToNextLevel * 1.5)};
-          const v = typeof opt.value === 'number' ? opt.value : 0;
-          if (opt.type === 'damage') n.damage *= (1 + v);
-          if (opt.type === 'speed') n.speed += v;
-          if (opt.type === 'fireRate') n.fireRate = Math.max(6, Math.floor(n.fireRate * (1 - v)));
-          if (opt.type === 'heal') n.hp = Math.min(n.maxHp, n.hp + v);
-          if (opt.type === 'weapon' && typeof opt.value === 'string' && !n.weapons.includes(opt.value)) n.weapons = [...n.weapons, opt.value];
-          if (opt.type === 'multishot') n.projectileCount += v;
-          return n;
-        });
-        setStatus(GameStatus.PLAYING);
-        playSound('upgrade');
-      }} />}
+      {status === GameStatus.LEVEL_UP && (
+        <LevelUpModal options={upgradeOptions} onSelect={opt => {
+          setPlayerStats(p => {
+            const n = {...p, level: p.level + 1, xp: 0, xpToNextLevel: Math.floor(p.xpToNextLevel * 1.5)};
+            const v = typeof opt.value === 'number' ? opt.value : 0;
+            if (opt.type === 'damage') n.damage *= (1 + v);
+            if (opt.type === 'speed') n.speed += v;
+            if (opt.type === 'fireRate') n.fireRate = Math.max(6, Math.floor(n.fireRate * (1 - v)));
+            if (opt.type === 'heal') n.hp = Math.min(n.maxHp, n.hp + v);
+            if (opt.type === 'weapon' && typeof opt.value === 'string' && !n.weapons.includes(opt.value)) n.weapons = [...n.weapons, opt.value];
+            if (opt.type === 'multishot') n.projectileCount += v;
+            return n;
+          });
+          setStatus(GameStatus.PLAYING);
+          playSound('upgrade');
+        }} />
+      )}
       
       {status === GameStatus.GAME_OVER && <GameOverModal stats={playerStats} onRestart={startGame} />}
     </div>
