@@ -3,11 +3,15 @@ import { UpgradeOption, EnemyType, Character, PlayerStats } from './types';
 
 export const CANVAS_WIDTH = window.innerWidth;
 export const CANVAS_HEIGHT = window.innerHeight;
+export const MAP_WIDTH = 4000;
+export const MAP_HEIGHT = 4000;
 
 export const INITIAL_PLAYER_STATS: PlayerStats = {
   hp: 100,
   maxHp: 100,
-  speed: 3.5,
+  mana: 0,
+  maxMana: 100,
+  speed: 4.5, // Slightly faster for big map
   damage: 15,
   fireRate: 40, 
   bulletSpeed: 9,
@@ -20,15 +24,30 @@ export const INITIAL_PLAYER_STATS: PlayerStats = {
   characterId: 'default',
   color: '#00f3ff',
   weaponType: 'claw',
+  
+  // Passives
+  hasAura: false,
+  auraRadius: 100,
+  auraDamage: 0.5, // per frame
+  hasOrbitals: false,
+  orbitalCount: 0,
+  orbitalSpeed: 0.05,
+  orbitalDamage: 10,
 };
 
 export const COLORS = {
-  background: '#0a0a12', // Darker night blue/black
+  background: '#050508', // Darker void
   player: '#00f3ff', 
   bullet: '#00ffff', // Cyan claws
   gem: '#00ff66', 
+  health: '#ff0033', // Red for health potion
+  mana: '#00ccff', // Blue for mana
   text: '#ffffff',
+  grid: '#1a1a2e',
 };
+
+export const HEALTH_DROP_CHANCE = 0.01; // 1% chance per enemy
+export const HEALTH_DROP_AMOUNT = 20;
 
 export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpBase: number, damage: number, speed: number, xp: number }> = {
   mouse: {
@@ -36,7 +55,7 @@ export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpB
     radius: 12,
     hpBase: 10,
     damage: 5,
-    speed: 2.5,
+    speed: 3.5, // Faster on big map
     xp: 5
   },
   bear: {
@@ -44,7 +63,7 @@ export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpB
     radius: 24,
     hpBase: 60,
     damage: 15,
-    speed: 1.2,
+    speed: 1.8,
     xp: 20
   },
   bat: {
@@ -52,7 +71,7 @@ export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpB
     radius: 10,
     hpBase: 15,
     damage: 8,
-    speed: 3.5,
+    speed: 4.5,
     xp: 12
   },
   ghost: {
@@ -60,7 +79,7 @@ export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpB
     radius: 20,
     hpBase: 150,
     damage: 25,
-    speed: 0.8,
+    speed: 1.2,
     xp: 100
   }
 };
@@ -74,7 +93,9 @@ export const CHARACTERS: Character[] = [
     isUnlocked: () => true,
     baseStats: {},
     color: '#00f3ff', // Cyan
-    icon: '🐱'
+    icon: '🐱',
+    specialName: 'SUPER NOVA',
+    specialDescription: 'Ekrandaki tüm düşmanları anında yok eder.'
   },
   {
     id: 'blitz',
@@ -83,13 +104,15 @@ export const CHARACTERS: Character[] = [
     unlockCondition: '5. Seviyeye Ulaş',
     isUnlocked: (data) => data.maxLevel >= 5,
     baseStats: {
-      speed: 5.0,
+      speed: 6.5,
       fireRate: 30, // Faster shooting
       maxHp: 60,
       hp: 60,
     },
     color: '#ffaa00', // Orange
-    icon: '⚡'
+    icon: '⚡',
+    specialName: 'TIME FREEZE',
+    specialDescription: '5 saniye boyunca zamanı dondurur.'
   },
   {
     id: 'chonk',
@@ -98,14 +121,16 @@ export const CHARACTERS: Character[] = [
     unlockCondition: 'Toplam 250 Düşman Öldür',
     isUnlocked: (data) => data.totalKills >= 250,
     baseStats: {
-      speed: 2.0,
+      speed: 3.0,
       maxHp: 200,
       hp: 200,
       projectileCount: 2,
       damage: 10,
     },
     color: '#00ff00', // Green
-    icon: '🐅'
+    icon: '🐅',
+    specialName: 'IRON SKIN',
+    specialDescription: '8 saniye boyunca ölümsüz olur.'
   },
   {
     id: 'void',
@@ -122,7 +147,9 @@ export const CHARACTERS: Character[] = [
       color: '#aa00ff'
     },
     color: '#aa00ff', // Purple
-    icon: '🔮'
+    icon: '🔮',
+    specialName: 'BLACK HOLE',
+    specialDescription: 'Düşmanları yutan bir kara delik açar.'
   }
 ];
 
@@ -217,5 +244,50 @@ export const UPGRADE_POOL: UpgradeOption[] = [
     value: 'beam',
     icon: '🔦',
     rarity: 'legendary',
+  },
+  {
+    id: 'wpn_axe',
+    title: 'Savaş Baltası',
+    description: 'Silahını ağır hasarlı Baltaya çevirir.',
+    type: 'weapon',
+    value: 'axe',
+    icon: '🪓',
+    rarity: 'legendary',
+  },
+  {
+    id: 'wpn_boom',
+    title: 'Bumerang',
+    description: 'Düşmanları biçip geri dönen Bumerang.',
+    type: 'weapon',
+    value: 'boomerang',
+    icon: '🪃',
+    rarity: 'legendary',
+  },
+  {
+    id: 'wpn_spiral',
+    title: 'Yıldız Yağmuru',
+    description: 'Dönerek açılan koruyucu yıldızlar saçar.',
+    type: 'weapon',
+    value: 'spiral',
+    icon: '🌟',
+    rarity: 'legendary',
+  },
+  {
+    id: 'aura_1',
+    title: 'Sarımsak Aurası',
+    description: 'Etrafında hasar veren bir alan oluşturur.',
+    type: 'aura',
+    value: 1,
+    icon: '🧄',
+    rarity: 'rare',
+  },
+  {
+    id: 'orbital_1',
+    title: 'Koruyucu Kitap',
+    description: 'Etrafında dönen koruyucu bir cisim ekler.',
+    type: 'orbital',
+    value: 1,
+    icon: '📘',
+    rarity: 'rare',
   },
 ];

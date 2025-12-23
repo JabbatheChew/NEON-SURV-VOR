@@ -118,7 +118,17 @@ const App: React.FC = () => {
       if (option.type === 'weapon') {
         // @ts-ignore
         next.weaponType = option.value;
-      } else {
+      } 
+      else if (option.type === 'aura') {
+         next.hasAura = true;
+         // Increase radius if already has it
+         if (prev.hasAura) next.auraRadius += 20;
+      }
+      else if (option.type === 'orbital') {
+         next.hasOrbitals = true;
+         next.orbitalCount += 1;
+      }
+      else {
         const val = Number(option.value);
         switch (option.type) {
           case 'damage': next.damage *= (1 + val); break;

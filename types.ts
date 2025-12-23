@@ -10,6 +10,8 @@ export enum GameStatus {
 export interface PlayerStats {
   hp: number;
   maxHp: number;
+  mana: number;       
+  maxMana: number;    
   speed: number;
   damage: number;
   fireRate: number; // Frames between shots
@@ -24,7 +26,17 @@ export interface PlayerStats {
   // Character specific visuals/mechanics
   characterId: string;
   color: string;
-  weaponType: 'claw' | 'orb' | 'beam';
+  weaponType: 'claw' | 'orb' | 'beam' | 'axe' | 'boomerang' | 'spiral'; // Added types
+  
+  // Passives
+  hasAura: boolean;
+  auraRadius: number;
+  auraDamage: number;
+  
+  hasOrbitals: boolean;
+  orbitalCount: number;
+  orbitalSpeed: number;
+  orbitalDamage: number;
 }
 
 export interface Position {
@@ -58,10 +70,17 @@ export interface Bullet extends Entity {
   life: number; // Frames to live
   color: string;
   angle: number; // For drawing rotation
-  style: 'claw' | 'orb' | 'beam';
+  style: 'claw' | 'orb' | 'beam' | 'axe' | 'boomerang' | 'spiral';
+  gravity?: number; // For axe physics
+  
+  // New physics props
+  initialVx?: number; 
+  initialVy?: number;
+  spawnFrame?: number; // For time-based pathing (spiral)
 }
 
 export interface Gem extends Entity {
+  type: 'xp' | 'health'; // Distinguish between XP and HP drops
   value: number;
   color: string;
   vx: number;
@@ -72,7 +91,7 @@ export interface UpgradeOption {
   id: string;
   title: string;
   description: string;
-  type: 'damage' | 'speed' | 'fireRate' | 'bulletSpeed' | 'penetration' | 'heal' | 'multishot' | 'weapon';
+  type: 'damage' | 'speed' | 'fireRate' | 'bulletSpeed' | 'penetration' | 'heal' | 'multishot' | 'weapon' | 'aura' | 'orbital';
   value: number | string; // value can be string for weapon type change
   icon: string;
   rarity: 'common' | 'rare' | 'legendary';
@@ -97,4 +116,6 @@ export interface Character {
   baseStats: Partial<PlayerStats>;
   color: string;
   icon: string;
+  specialName: string;         
+  specialDescription: string;  
 }
