@@ -1,8 +1,38 @@
 
-import { UpgradeOption, EnemyType, Character, PlayerStats } from './types';
+import { UpgradeOption, EnemyType, Character, PlayerStats, MapType, MapConfig } from './types';
 
 export const MAP_WIDTH = 4000;
 export const MAP_HEIGHT = 4000;
+
+export const MAP_CONFIGS: Record<MapType, MapConfig> = {
+  forest: {
+    id: 'forest',
+    name: 'Cyber Forest',
+    bgColor: '#050a05',
+    gridColor: '#0a1a0a',
+    accentColor: '#00ff66',
+    description: 'Neon yapraklar ve pürüzsüz enerji.',
+    icon: '🌳'
+  },
+  desert: {
+    id: 'desert',
+    name: 'Neon Desert',
+    bgColor: '#0a0805',
+    gridColor: '#1a140a',
+    accentColor: '#ffaa00',
+    description: 'Sonsuz kumlar ve kavurucu sıcak.',
+    icon: '🏜️'
+  },
+  lava: {
+    id: 'lava',
+    name: 'Techno Lava',
+    bgColor: '#0a0505',
+    gridColor: '#1a0a0a',
+    accentColor: '#ff3300',
+    description: 'Erimiş devreler ve volkanik küller.',
+    icon: '🌋'
+  }
+};
 
 export const INITIAL_PLAYER_STATS: PlayerStats = {
   hp: 100,
@@ -10,7 +40,7 @@ export const INITIAL_PLAYER_STATS: PlayerStats = {
   mana: 0,
   maxMana: 100,
   speed: 4.8, 
-  damage: 25, // Hasar artırıldı
+  damage: 25, 
   fireRate: 45, 
   bulletSpeed: 10,
   penetration: 1,
@@ -23,6 +53,7 @@ export const INITIAL_PLAYER_STATS: PlayerStats = {
   characterId: 'default',
   color: '#00f3ff',
   weapons: ['claw'], 
+  selectedMap: 'forest',
   hasAura: false,
   auraRadius: 100,
   auraDamage: 0.5, 
@@ -45,16 +76,18 @@ export const COLORS = {
 };
 
 export const PICKUP_CHANCES = {
-  health: 0.02,
-  magnet: 0.01,
-  bomb: 0.007
+  bomb: 0.008,   // En nadir
+  magnet: 0.012, 
+  health: 0.025  // En yaygın
 };
 
 export const ENEMY_TYPES: Record<EnemyType, { color: string, radius: number, hpBase: number, damage: number, speed: number, xp: number }> = {
-  skeleton: { color: '#f8fafc', radius: 16, hpBase: 15, damage: 5, speed: 2.2, xp: 12 }, // HP 30 -> 15
-  orc: { color: '#166534', radius: 26, hpBase: 80, damage: 15, speed: 1.4, xp: 45 },    // HP 140 -> 80
-  vampire: { color: '#b91c1c', radius: 19, hpBase: 35, damage: 12, speed: 3.5, xp: 30 }, // HP 55 -> 35
-  bat: { color: '#6d28d9', radius: 11, hpBase: 8, damage: 4, speed: 4.8, xp: 8 }        // HP 12 -> 8
+  skeleton: { color: '#f8fafc', radius: 16, hpBase: 15, damage: 5, speed: 2.2, xp: 12 }, 
+  orc: { color: '#166534', radius: 26, hpBase: 80, damage: 15, speed: 1.4, xp: 45 },    
+  vampire: { color: '#b91c1c', radius: 19, hpBase: 35, damage: 12, speed: 3.5, xp: 30 }, 
+  bat: { color: '#6d28d9', radius: 11, hpBase: 8, damage: 4, speed: 4.8, xp: 8 },
+  snake: { color: '#22c55e', radius: 14, hpBase: 40, damage: 10, speed: 3.0, xp: 25 },
+  dragon: { color: '#f59e0b', radius: 45, hpBase: 500, damage: 25, speed: 1.8, xp: 250 }
 };
 
 export const CHARACTERS: Character[] = [

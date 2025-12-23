@@ -8,6 +8,18 @@ export enum GameStatus {
   STUDIO = 'STUDIO'
 }
 
+export type MapType = 'forest' | 'desert' | 'lava';
+
+export interface MapConfig {
+  id: MapType;
+  name: string;
+  bgColor: string;
+  gridColor: string;
+  accentColor: string;
+  description: string;
+  icon: string;
+}
+
 export interface PlayerStats {
   hp: number;
   maxHp: number;
@@ -29,6 +41,7 @@ export interface PlayerStats {
   color: string;
   weapons: string[]; 
   customSkinUrl?: string;
+  selectedMap: MapType;
   
   hasAura: boolean;
   auraRadius: number;
@@ -50,7 +63,7 @@ export interface Entity extends Position {
   radius: number;
 }
 
-export type EnemyType = 'skeleton' | 'orc' | 'vampire' | 'bat';
+export type EnemyType = 'skeleton' | 'orc' | 'vampire' | 'bat' | 'snake' | 'dragon';
 
 export interface Enemy extends Entity {
   type: EnemyType;

@@ -5,8 +5,8 @@ import GameCanvas from './components/GameCanvas';
 import HUD from './components/HUD';
 import LevelUpModal from './components/LevelUpModal';
 import GameOverModal from './components/GameOverModal';
-import { GameStatus, PlayerStats, UpgradeOption, Character } from './types';
-import { INITIAL_PLAYER_STATS, UPGRADE_POOL, CHARACTERS as STATIC_CHARACTERS } from './constants';
+import { GameStatus, PlayerStats, UpgradeOption, Character, MapType } from './types';
+import { INITIAL_PLAYER_STATS, UPGRADE_POOL, CHARACTERS as STATIC_CHARACTERS, MAP_CONFIGS } from './constants';
 import { playSound, toggleMute } from './utils/SoundManager';
 
 const App: React.FC = () => {
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [gameId, setGameId] = useState(0);
   const [characters, setCharacters] = useState<Character[]>([...STATIC_CHARACTERS]);
   const [selectedCharId, setSelectedCharId] = useState<string>('default');
+  const [selectedMapId, setSelectedMapId] = useState<MapType>('forest');
   const [customSkins, setCustomSkins] = useState<Record<string, string>>({});
   const [isMuted, setIsMuted] = useState(false);
   
@@ -40,7 +41,6 @@ const App: React.FC = () => {
   }, [status]);
 
   const handleLevelUp = useCallback(() => {
-    // Rastgele 3 seçenek seç (Oyuncunun sahip olmadığı silahları önceliklendir veya istatistikleri sun)
     const availableUpgrades = UPGRADE_POOL.filter(upgrade => {
       if (upgrade.type === 'weapon') {
         return !playerStats.weapons.includes(upgrade.value as string);
@@ -48,7 +48,6 @@ const App: React.FC = () => {
       return true;
     });
 
-    // Karıştır ve ilk 3'ü al
     const shuffled = [...availableUpgrades].sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, 3);
     
@@ -147,32 +146,85 @@ const App: React.FC = () => {
 
   const startGame = () => {
     const char = characters.find(c => c.id === selectedCharId)!;
-    setPlayerStats({ ...INITIAL_PLAYER_STATS, ...char.baseStats, characterId: char.id, color: char.color, customSkinUrl: customSkins[char.id] });
+    setPlayerStats({ 
+      ...INITIAL_PLAYER_STATS, 
+      ...char.baseStats, 
+      characterId: char.id, 
+      color: char.color, 
+      customSkinUrl: customSkins[char.id],
+      selectedMap: selectedMapId
+    });
     setGameId(g => g + 1); setStatus(GameStatus.PLAYING); playSound('start');
   };
+
+  const selectedChar = characters.find(c => c.id === selectedCharId);
 
   return (
     <div className="relative w-full h-screen bg-[#050508] text-white font-sans overflow-hidden">
       {status === GameStatus.MENU && (
         <div className="absolute inset-0 bg-[#050510] flex flex-col items-center py-6 px-4 overflow-y-auto">
-          <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-blue-600 mb-4 uppercase drop-shadow-2xl text-center">NEON SURVIVOR</h1>
+          <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-blue-600 mb-8 uppercase drop-shadow-2xl text-center">NEON SURVIVOR</h1>
           
-          <div className="flex-1 w-full max-w-4xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-2 custom-scrollbar">
-            {characters.map(char => (
-              <button key={char.id} onClick={() => setSelectedCharId(char.id)}
-                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative ${selectedCharId === char.id ? 'border-cyan-400 bg-cyan-950/20 scale-105 shadow-lg' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
-                <div className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center">
-                  {customSkins[char.id] ? <img src={customSkins[char.id]} className="w-full h-full object-contain rounded-full shadow-inner" /> : <div className="text-4xl md:text-5xl">{char.icon}</div>}
+          <div className="flex-1 w-full max-w-5xl flex flex-col md:flex-row gap-8 items-center justify-center">
+            {/* Character & Map Selection Container */}
+            <div className="flex flex-col gap-6 w-full md:w-2/3">
+              {/* Karakter Seçimi */}
+              <div className="bg-gray-900/30 p-4 rounded-3xl border border-gray-800">
+                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Karakter Seç</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 custom-scrollbar">
+                  {characters.map(char => (
+                    <button key={char.id} onClick={() => setSelectedCharId(char.id)}
+                      className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative ${selectedCharId === char.id ? 'border-cyan-400 bg-cyan-950/20 scale-105 shadow-lg' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
+                      <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
+                        {customSkins[char.id] ? <img src={customSkins[char.id]} className="w-full h-full object-contain rounded-full shadow-inner" /> : <div className="text-3xl md:text-4xl">{char.icon}</div>}
+                      </div>
+                      <div className="font-bold text-[10px] text-center line-clamp-1 opacity-80">{char.name}</div>
+                      {char.id.startsWith('custom_') && <div className="absolute top-1 right-1 text-[6px] font-black bg-purple-600 px-1 py-0.5 rounded uppercase">AI</div>}
+                    </button>
+                  ))}
                 </div>
-                <div className="font-bold text-xs text-center line-clamp-1 opacity-80">{char.name}</div>
-                {char.id.startsWith('custom_') && <div className="absolute top-1 right-1 text-[7px] font-black bg-purple-600 px-1 py-0.5 rounded uppercase">AI</div>}
-              </button>
-            ))}
+              </div>
+
+              {/* Harita Seçimi */}
+              <div className="bg-gray-900/30 p-4 rounded-3xl border border-gray-800">
+                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Bölge Seç</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {(Object.values(MAP_CONFIGS)).map(map => (
+                    <button key={map.id} onClick={() => setSelectedMapId(map.id)}
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative group overflow-hidden ${selectedMapId === map.id ? 'border-orange-500 bg-orange-950/20 scale-105 shadow-lg' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
+                      <div className="text-3xl mb-1 group-hover:scale-125 transition-transform">{map.icon}</div>
+                      <div className="font-black text-[10px] uppercase tracking-tighter">{map.name}</div>
+                      <div className={`absolute inset-0 bg-gradient-to-t opacity-10 pointer-events-none`} style={{ backgroundColor: map.accentColor }}></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 3D Character Preview Panel */}
+            <div className="w-full md:w-1/3 perspective-container hidden md:block">
+              <div className="char-3d-card bg-cyan-950/10 border border-cyan-400/30 rounded-3xl p-8 flex flex-col items-center justify-center relative shadow-[0_0_50px_rgba(0,243,255,0.1)] h-[400px]">
+                <div className="absolute inset-0 hologram-grid opacity-20 rounded-3xl"></div>
+                <div className="floating-anim relative z-10 flex flex-col items-center">
+                   {customSkins[selectedCharId] ? (
+                     <img src={customSkins[selectedCharId]} className="w-48 h-48 object-contain drop-shadow-[0_0_25px_rgba(0,243,255,0.8)]" />
+                   ) : (
+                     <div className="text-9xl drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]">{selectedChar?.icon}</div>
+                   )}
+                   <div className="mt-8 text-center">
+                     <h3 className="text-2xl font-black text-cyan-400 uppercase tracking-tighter italic">{selectedChar?.name}</h3>
+                     <p className="text-xs text-gray-400 mt-2 uppercase tracking-widest">{selectedChar?.specialName}</p>
+                   </div>
+                </div>
+                {/* 3D Floor Effect */}
+                <div className="absolute bottom-10 w-32 h-8 bg-cyan-400/20 blur-xl rounded-full"></div>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-4 flex flex-col sm:flex-row gap-3 w-full max-sm:w-full max-w-sm">
-            <button onClick={() => setStatus(GameStatus.STUDIO)} className="flex-1 py-3 bg-purple-700 hover:bg-purple-600 font-bold text-base rounded-xl border-b-4 border-purple-900 transition-all">AI STUDIO ✨</button>
-            <button onClick={startGame} className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 font-black text-xl rounded-xl border-b-4 border-cyan-800 transition-all active:translate-y-1">BAŞLAT</button>
+          <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full max-sm:w-full max-w-md pb-8">
+            <button onClick={() => setStatus(GameStatus.STUDIO)} className="flex-1 py-4 bg-purple-700 hover:bg-purple-600 font-bold text-base rounded-2xl border-b-4 border-purple-900 transition-all shadow-xl uppercase italic">STUDIO ✨</button>
+            <button onClick={startGame} className="flex-2 py-4 px-12 bg-orange-600 hover:bg-orange-500 font-black text-2xl rounded-2xl border-b-4 border-orange-800 transition-all active:translate-y-1 shadow-[0_10px_30px_rgba(249,115,22,0.4)] uppercase italic tracking-tighter">OPERASYON: BAŞLAT</button>
           </div>
         </div>
       )}
@@ -204,9 +256,9 @@ const App: React.FC = () => {
 
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-56 flex flex-col gap-2">
-                  <div className="aspect-square bg-gray-900 rounded-xl border border-gray-800 flex items-center justify-center overflow-hidden relative shadow-2xl">
+                  <div className="aspect-square bg-gray-900 rounded-xl border border-gray-800 flex items-center justify-center overflow-hidden relative shadow-2xl perspective-container">
                     {(lastGeneratedUrl || customSkins[selectedCharId]) ? (
-                      <img src={lastGeneratedUrl || customSkins[selectedCharId]} className="w-full h-full object-contain p-2" />
+                      <img src={lastGeneratedUrl || customSkins[selectedCharId]} className="w-full h-full object-contain p-2 floating-anim" />
                     ) : (
                       <div className="text-4xl opacity-10">🎨</div>
                     )}

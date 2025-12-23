@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
   <head>
@@ -16,7 +17,7 @@
       canvas {
         display: block;
       }
-      /* Custom Scrollbar for upgrade menu */
+      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
       }
@@ -29,6 +30,29 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #555; 
+      }
+
+      /* 3D Perspective Effects */
+      .perspective-container {
+        perspective: 1000px;
+      }
+      .char-3d-card {
+        transform-style: preserve-3d;
+        transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      .char-3d-card:hover {
+        transform: rotateY(15deg) rotateX(5deg);
+      }
+      .floating-anim {
+        animation: float 3s ease-in-out infinite;
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) translateZ(50px); }
+        50% { transform: translateY(-15px) translateZ(80px); }
+      }
+      .hologram-grid {
+        background-image: linear-gradient(0deg, transparent 24%, rgba(0, 243, 255, .05) 25%, rgba(0, 243, 255, .05) 26%, transparent 27%, transparent 74%, rgba(0, 243, 255, .05) 75%, rgba(0, 243, 255, .05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 243, 255, .05) 25%, rgba(0, 243, 255, .05) 26%, transparent 27%, transparent 74%, rgba(0, 243, 255, .05) 75%, rgba(0, 243, 255, .05) 76%, transparent 77%, transparent);
+        background-size: 30px 30px;
       }
     </style>
   <script type="importmap">
