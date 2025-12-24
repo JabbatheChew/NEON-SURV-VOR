@@ -159,7 +159,13 @@ const App: React.FC = () => {
 
   const selectedChar = characters.find(c => c.id === selectedCharId);
 
-  // Helper check for active game session
+  // Stats for preview
+  const charStats = {
+    hp: selectedChar?.baseStats.hp || INITIAL_PLAYER_STATS.hp,
+    speed: selectedChar?.baseStats.speed || INITIAL_PLAYER_STATS.speed,
+    damage: selectedChar?.baseStats.damage || INITIAL_PLAYER_STATS.damage
+  };
+
   const isGameActive = status === GameStatus.PLAYING || status === GameStatus.LEVEL_UP || status === GameStatus.PAUSED_MANUAL;
 
   return (
@@ -168,32 +174,40 @@ const App: React.FC = () => {
         <div className="absolute inset-0 bg-[#050510] flex flex-col items-center py-6 px-4 overflow-y-auto z-50">
           <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-blue-600 mb-8 uppercase drop-shadow-2xl text-center">NEON SURVIVOR</h1>
           
-          <div className="flex-1 w-full max-w-5xl flex flex-col md:flex-row gap-8 items-center justify-center">
-            <div className="flex flex-col gap-6 w-full md:w-2/3">
-              <div className="bg-gray-900/30 p-4 rounded-3xl border border-gray-800">
-                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Karakter Seç</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 custom-scrollbar">
+          <div className="flex-1 w-full max-w-6xl flex flex-col lg:flex-row gap-8 items-center justify-center">
+            {/* Left Column: Character and Map Lists */}
+            <div className="flex flex-col gap-6 w-full lg:w-3/5">
+              <div className="bg-gray-900/30 p-5 rounded-3xl border border-gray-800 backdrop-blur-md">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2">Karakterini Seç</h3>
+                  <span className="text-[10px] font-bold text-cyan-500 bg-cyan-950/40 px-3 py-1 rounded-full border border-cyan-900/50 uppercase">Kapasite: {characters.length} Birim</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {characters.map(char => (
-                    <button key={char.id} onClick={() => setSelectedCharId(char.id)}
-                      className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative ${selectedCharId === char.id ? 'border-cyan-400 bg-cyan-950/20 scale-105 shadow-lg' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
-                      <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
-                        {customSkins[char.id] ? <img src={customSkins[char.id]} className="w-full h-full object-contain rounded-full shadow-inner" /> : <div className="text-3xl md:text-4xl">{char.icon}</div>}
+                    <button key={char.id} onClick={() => { setSelectedCharId(char.id); playSound('xp'); }}
+                      className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative group ${selectedCharId === char.id ? 'border-cyan-400 bg-cyan-950/20 scale-105 shadow-[0_0_20px_rgba(34,211,238,0.2)]' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
+                      <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center">
+                        {customSkins[char.id] ? (
+                          <img src={customSkins[char.id]} className="w-full h-full object-contain rounded-full shadow-inner" />
+                        ) : (
+                          <div className="text-3xl md:text-4xl group-hover:scale-110 transition-transform">{char.icon}</div>
+                        )}
                       </div>
-                      <div className="font-bold text-[10px] text-center line-clamp-1 opacity-80">{char.name}</div>
-                      {char.id.startsWith('custom_') && <div className="absolute top-1 right-1 text-[6px] font-black bg-purple-600 px-1 py-0.5 rounded uppercase">AI</div>}
+                      <div className={`font-black text-[10px] text-center line-clamp-1 uppercase tracking-tighter ${selectedCharId === char.id ? 'text-cyan-400' : 'text-gray-500'}`}>{char.name}</div>
+                      {char.id.startsWith('custom_') && <div className="absolute top-1 right-1 text-[6px] font-black bg-purple-600 px-1 py-0.5 rounded uppercase shadow-sm">AI</div>}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="bg-gray-900/30 p-4 rounded-3xl border border-gray-800">
-                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Bölge Seç</h3>
+              <div className="bg-gray-900/30 p-5 rounded-3xl border border-gray-800 backdrop-blur-md">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 ml-2">Bölge Seç</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {(Object.values(MAP_CONFIGS)).map(map => (
-                    <button key={map.id} onClick={() => setSelectedMapId(map.id)}
-                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative group overflow-hidden ${selectedMapId === map.id ? 'border-orange-500 bg-orange-950/20 scale-105 shadow-lg' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
-                      <div className="text-3xl mb-1 group-hover:scale-125 transition-transform">{map.icon}</div>
-                      <div className="font-black text-[10px] uppercase tracking-tighter">{map.name}</div>
+                    <button key={map.id} onClick={() => { setSelectedMapId(map.id); playSound('xp'); }}
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative group overflow-hidden ${selectedMapId === map.id ? 'border-orange-500 bg-orange-950/20 scale-105 shadow-[0_0_20px_rgba(249,115,22,0.2)]' : 'border-gray-800 bg-gray-900/30 hover:border-gray-700'}`}>
+                      <div className="text-3xl mb-1 group-hover:scale-125 transition-transform z-10">{map.icon}</div>
+                      <div className={`font-black text-[10px] uppercase tracking-tighter z-10 ${selectedMapId === map.id ? 'text-orange-400' : 'text-gray-500'}`}>{map.name}</div>
                       <div className={`absolute inset-0 bg-gradient-to-t opacity-10 pointer-events-none`} style={{ backgroundColor: map.accentColor }}></div>
                     </button>
                   ))}
@@ -201,28 +215,83 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="w-full md:w-1/3 perspective-container hidden md:block">
-              <div className="char-3d-card bg-cyan-950/10 border border-cyan-400/30 rounded-3xl p-8 flex flex-col items-center justify-center relative shadow-[0_0_50px_rgba(0,243,255,0.1)] h-[400px]">
-                <div className="absolute inset-0 hologram-grid opacity-20 rounded-3xl"></div>
-                <div className="floating-anim relative z-10 flex flex-col items-center">
+            {/* Right Column: Character Details and Stats Preview */}
+            <div className="w-full lg:w-2/5 perspective-container">
+              <div className="char-3d-card bg-black/40 border border-cyan-400/20 rounded-3xl p-8 flex flex-col items-center justify-between relative shadow-[0_0_80px_rgba(0,0,0,0.5)] h-[550px] backdrop-blur-md">
+                <div className="absolute inset-0 hologram-grid opacity-10 rounded-3xl"></div>
+                
+                {/* Character Icon/Skin Floating */}
+                <div className="floating-anim relative z-10 flex flex-col items-center justify-center flex-1">
                    {customSkins[selectedCharId] ? (
-                     <img src={customSkins[selectedCharId]} className="w-48 h-48 object-contain drop-shadow-[0_0_25px_rgba(0,243,255,0.8)]" />
+                     <img src={customSkins[selectedCharId]} className="w-56 h-56 object-contain drop-shadow-[0_0_35px_rgba(0,243,255,0.7)]" />
                    ) : (
-                     <div className="text-9xl drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]">{selectedChar?.icon}</div>
+                     <div className="text-[120px] drop-shadow-[0_0_40px_rgba(255,255,255,0.3)] select-none">{selectedChar?.icon}</div>
                    )}
-                   <div className="mt-8 text-center">
-                     <h3 className="text-2xl font-black text-cyan-400 uppercase tracking-tighter italic">{selectedChar?.name}</h3>
-                     <p className="text-xs text-gray-400 mt-2 uppercase tracking-widest">{selectedChar?.specialName}</p>
+                </div>
+
+                {/* Character Name and Special Ability */}
+                <div className="w-full text-center relative z-10 mb-6">
+                   <h3 className="text-4xl font-black text-cyan-400 uppercase tracking-tighter italic drop-shadow-sm">{selectedChar?.name}</h3>
+                   <div className="flex items-center justify-center gap-2 mt-2">
+                     <span className="h-[1px] w-8 bg-cyan-900"></span>
+                     <p className="text-[10px] text-cyan-500 font-black uppercase tracking-[0.2em]">{selectedChar?.specialName}</p>
+                     <span className="h-[1px] w-8 bg-cyan-900"></span>
+                   </div>
+                   <p className="text-[11px] text-gray-500 mt-3 px-6 leading-relaxed italic opacity-80">"{selectedChar?.description}"</p>
+                </div>
+
+                {/* Stats Section */}
+                <div className="w-full bg-gray-950/50 p-6 rounded-2xl border border-gray-800/50 z-10">
+                   <div className="space-y-4">
+                      {/* HP Bar */}
+                      <div>
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-gray-500 mb-1">
+                          <span>Dayanıklılık (HP)</span>
+                          <span className="text-red-500">{charStats.hp}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
+                          <div className="h-full bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.5)] transition-all duration-500" style={{ width: `${(charStats.hp / 250) * 100}%` }}></div>
+                        </div>
+                      </div>
+                      {/* Speed Bar */}
+                      <div>
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-gray-500 mb-1">
+                          <span>Çeviklik (Hız)</span>
+                          <span className="text-emerald-500">{charStats.speed.toFixed(1)}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
+                          <div className="h-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] transition-all duration-500" style={{ width: `${(charStats.speed / 7) * 100}%` }}></div>
+                        </div>
+                      </div>
+                      {/* Damage Bar */}
+                      <div>
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-gray-500 mb-1">
+                          <span>Vuruş Gücü (ATK)</span>
+                          <span className="text-orange-500">{charStats.damage}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
+                          <div className="h-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)] transition-all duration-500" style={{ width: `${(charStats.damage / 40) * 100}%` }}></div>
+                        </div>
+                      </div>
                    </div>
                 </div>
-                <div className="absolute bottom-10 w-32 h-8 bg-cyan-400/20 blur-xl rounded-full"></div>
+
+                <div className="absolute bottom-16 w-32 h-10 bg-cyan-400/20 blur-2xl rounded-full pointer-events-none"></div>
               </div>
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full max-sm:w-full max-w-md pb-8">
-            <button onClick={() => setStatus(GameStatus.STUDIO)} className="flex-1 py-4 bg-purple-700 hover:bg-purple-600 font-bold text-base rounded-2xl border-b-4 border-purple-900 transition-all shadow-xl uppercase italic">STUDIO ✨</button>
-            <button onClick={startGame} className="flex-2 py-4 px-12 bg-orange-600 hover:bg-orange-500 font-black text-2xl rounded-2xl border-b-4 border-orange-800 transition-all active:translate-y-1 shadow-[0_10px_30px_rgba(249,115,22,0.4)] uppercase italic tracking-tighter">OPERASYON: BAŞLAT</button>
+          {/* Action Buttons */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full max-w-lg pb-10 px-4">
+            <button onClick={() => { setStatus(GameStatus.STUDIO); playSound('xp'); }} 
+              className="flex-1 py-4 bg-purple-700 hover:bg-purple-600 font-bold text-base rounded-2xl border-b-4 border-purple-900 transition-all shadow-[0_10px_30px_rgba(126,34,206,0.3)] uppercase italic tracking-wider">
+              AI STUDIO ✨
+            </button>
+            <button onClick={startGame} 
+              className="flex-[2] py-4 px-12 bg-orange-600 hover:bg-orange-500 font-black text-2xl rounded-2xl border-b-4 border-orange-800 transition-all active:translate-y-1 shadow-[0_15px_40px_rgba(249,115,22,0.4)] uppercase italic tracking-tighter group">
+              SİMÜLASYONU BAŞLAT
+              <span className="block text-[10px] font-bold opacity-70 tracking-[0.3em] mt-0.5 group-hover:translate-x-1 transition-transform">INITIALIZING...</span>
+            </button>
           </div>
         </div>
       )}
@@ -305,7 +374,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* CORE GAME COMPONENTS - Persist during PAUSE and LEVEL UP */}
+      {/* CORE GAME COMPONENTS */}
       {isGameActive && (
         <>
           <GameCanvas 
